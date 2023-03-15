@@ -7,7 +7,7 @@ Rust 是一门十分高效的编程语言， 其设计目的是在编译时提�
 
 Rust的所有权模型是其编译时内存安全和管理的关键。所有权基于仿射类型，其中一个值最多只能使用一次。在Rust中，每个值都有一个所有者，例如，下面的代码中分配的字符串值“hello!”由hello变量拥有。在一个值被移动之后，例如，如果“hello!”在第5行中被从hello移动到owned\_string (第14行)，它的所有权将被转移，之前的所有者(hello)将不能再使用它。
 
-\begin{lstlisting}[caption=Rust Demo]
+\begin{lstlisting}[caption=Rust Demo, numbers=left]
 fn main() {
 	let hel: &str;
 	{

@@ -131,7 +131,7 @@
 %% 设置文档样式
 \ctexset {
     % 2022-11-1 Andre 将目录居中
-    contentsname = {\centering{目\quad 录}},
+    contentsname = {\centering{目录}},
     chapter = {
         number = \arabic{chapter},
         format = {\Heiti\bfseries\centering\zihao{4}},
