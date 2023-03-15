@@ -184,9 +184,9 @@
 % 2022-11-1 Andre 点间距
 \renewcommand{\cftdotsep}{1}
 % 2022-11-1 Andre 设置相关的目录文字格式
-\ctexset { chapter = { name={}, number = {\chinese {chapter}、} } }
-\ctexset { section = { name={}, number= {（\chinese {section}）} } } 
-\ctexset { subsection = { name={}, number= {\arabic{subsection}} } } 
+\ctexset { chapter = { name={}, number = {\arabic{chapter} } } }
+% \ctexset { section = { name={}, number= {（\chinese {section}）} } } 
+% \ctexset { subsection = { name={}, number= {\arabic{subsection}} } } 
 \renewcommand{\cftsubsecfont}{\Kaiti}
 \renewcommand{\cftsecfont}{\Songti}
 \renewcommand{\cftchapfont}{\Songti}
