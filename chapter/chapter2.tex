@@ -3,9 +3,51 @@
 
 \section{Rust：依赖语言的程序设计}
 
+Rust 是一门十分高效的编程语言， 其设计目的是在编译时提供强大的类型和内存安全保证，它将高级托管语言的强大功能和表达能力与类似c语言的无垃圾收集或底层运行时的效率相结合。编写操作系统可以利用Rust的许多特性来实现语言内、安全的操作系统设计，并使用crate (Rust的项目容器和翻译单元)实现源代码级模块化。而Cargo.toml包含源代码和依赖项清单。编写操作系统是没有使用Rust的标准库，但使用了它的基本核心和alloc库。
+
+Rust的所有权模型是其编译时内存安全和管理的关键。所有权基于仿射类型，其中一个值最多只能使用一次。在Rust中，每个值都有一个所有者，例如，下面的代码中分配的字符串值“hello!”由hello变量拥有。在一个值被移动之后，例如，如果“hello!”在第5行中被从hello移动到owned\_string (第14行)，它的所有权将被转移，之前的所有者(hello)将不能再使用它。
+
+\begin{lstlisting}[caption=Rust Demo]
+fn main() {
+	let hel: &str;
+	{
+		let hello = String::from("hello!");
+		// consume(hello); // -> "value moved" error in here.
+		let borrowed_str: &str = &hello;
+		hel = substr(borrowed_str);
+		// println!("{}", hel); // -> lifetime error
+	}
+}
+fn substr<'a> (input_str: &'a str) -> &'a str {
+	&input_str[0..3] // return value has lifetime 'a
+}
+fn consume(owned_string: String) { }
+\end{lstlisting}
+
+
+当所有者的作用域结束时，例如，在词法块的末尾，通过编译器插入对其析构函数的调用，所有者的值将被丢弃(释放)。Rust中的析构函数是通过实现给定类型的Drop特征来实现的，其中自定义的Drop处理程序可以执行除释放内存之外的任意操作。在上面的第8行中，hello字符串超出了作用域，并由它的删除处理程序自动释放。
+
+还可以通过 borrow 来获得对它们的引用(第6行)，而且这些引用的生命周期不能超过所拥有值的生命周期。第11行中的语法将input\_str参数的生命期命名为'a，并指定返回的\&str引用具有相同的生命期'a。返回的\&str引用在第7行中被赋值给hel，这将在第9行中由于生命周期的原因而被释放，因为在第8行中，hel将在它最初从(hello)借来的拥有值被删除后使用。Rust的编译器包括一个借用检查器来执行这些生命周期规则，以及别名异或可变性的核心原则，其中可以有多个不可变引用，也可以有单个对值的可变引用，但不能同时存在这两个引用。这允许它静态地确保堆栈和堆上的值的内存安全。
+
+系统设计还广泛利用了Rust泛型的特征，是一种抽象类型的声明，它指定了类型必须实现的方法集，类似于OOP语言中的多态接口。trait可用于在泛型类型参数上设置边界。例如，函数fn print\_str<T: Into<String>>(s: T){}，其中<T: Into<String>约束了入参s的类型，其必须实现Into<String>的泛型特征, 如果s没有符合类型约束则在代码编译时就会被抛出错误。
+
 \section{操作系统}
 
 \subsection{Riscv}
+
+\subsubsection{Riscv的机器模式}
+
+risc-v架构定义了3种工作模式，又称为特权模式（privileged mode）。
+
+\begin{itemize}
+    \item 机器模式（machine mode），简称M模式；
+    \item 监督模式（supervisor mode），简称S模式；
+    \item 用户模式（user mode），简称U模式。
+\end{itemize}
+
+Riscv架构定义机器模式为必选模式，另外两种模式为可选模式，通过不同的模式组合可以实现不同的系统。其中机器模式拥有最高的权限，而用户模式的权限则是最低的，权限高的模式对于权限低的模式是透明的，权限低的无法获得权限高的所拥有的资源。从而达到了层与层之间的隔离，设计上指令集是安全的。
+
+SBI（Supervisor Binary Interface）是Supervisor Execution Environment (SEE)和supervisor之间的接口。 它允许主管通过使用 ecall 指令执行一些特权操作。 SEE 和 supervisor 的示例有：Unix 类平台上的 M-Mode 和 S-Mode，其中 SBI 是它们之间的唯一接口，以及 Hypervisor extended-Supervisor (HS) 和 Virtualized Supervisor (VS)。
 
 \subsubsection{Sv39\pagescite{xv60}}
 
@@ -84,5 +126,67 @@ async fn eat () {
 }
 
 \end{lstlisting}
+
+
+
+\begin{figure}[htb]
+    \figureCapSet
+    \centering
+    \includegraphics[width=.8\linewidth]{figure/c2/breakfirststate.png}
+    \caption{Breakfirst的状态机图}
+    \label{figure:c2breakfirststate}
+\end{figure}
+
+
+\begin{figure}[htbp]
+    \figureCapSet
+	\centering
+	\begin{minipage}{0.49\linewidth}%表示图片的占用那一列的宽度
+		\centering
+        \begin{lstlisting}[frame=none]
+async fn eating(min_energy: usize) -> String {
+    let food = async_eat("milk").await;
+    if food.energy() < min_energy {
+        content + &async_eat("bread").await
+    } else {
+        content
+    }
+}
+        \end{lstlisting}
+	\end{minipage}
+    \hfill
+	%\hfill表示横向排，两张图片会自动保证一定的距离
+    %\vfill表示自动排版，两张图片会自动保证一定的距离
+    %或者直接在这里加空格来增加图片之间的距离
+	\begin{minipage}{0.49\linewidth}
+		\centering
+        \begin{lstlisting}[frame=none]
+enum BreakfirstStateMachine {
+    State(StartState),
+    WaitingOnMilk(WaitingOnMilkState),
+    WaitingOnBread(WaitingOnBreadState),
+    End(EndState),
+}
+        \end{lstlisting}
+	\end{minipage}
+    \caption{Breakfirst的状态机描述和与之对应的可能状态}
+\end{figure}
+
+\begin{lstlisting}[caption=Breakfirst的状态转换]
+impl Future for BreakfirstStateMachine {
+    type Output = String;
+    fn poll(self: Pin<&mut Self>, fo: &mut Food) -> Poll<Self::Output> {
+        loop {
+            match self {
+                BreakfirstStateMachine::Start(state) => {}
+                BreakfirstStateMachine::WaitingOnMilk(state) => {}
+                BreakfirstStateMachine::WaitingOnBread(state) => {}
+                BreakfirstStateMachine::End(state) => {}
+            }
+        }
+    }
+}
+\end{lstlisting}
+
 
 
