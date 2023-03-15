@@ -1,0 +1,173 @@
+\append
+
+
+\section*{环境搭建}
+
+\subsection*{Ubuntu配置}
+
+\begin{lstlisting}[language=bash, caption = Ubuntu 的国内源]
+sudo sed -i.bak "1i deb http://mirrors.aliyun.com/ubuntu/ jammy main restricted universe multiverse \ndeb-src http://mirrors.aliyun.com/ubuntu/ jammy main restricted universe multiverse \ndeb http://mirrors.aliyun.com/ubuntu/ jammy-security main restricted universe multiverse \ndeb-src http://mirrors.aliyun.com/ubuntu/ jammy-security main restricted universe multiverse \ndeb http://mirrors.aliyun.com/ubuntu/ jammy-updates main restricted universe multiverse \ndeb-src http://mirrors.aliyun.com/ubuntu/ jammy-updates main restricted universe multiverse \ndeb http://mirrors.aliyun.com/ubuntu/ jammy-proposed main restricted universe multiverse \ndeb-src http://mirrors.aliyun.com/ubuntu/ jammy-proposed main restricted universe multiverse \ndeb hthttp://mirrors.aliyun.com/ubuntu/tp://mirrors.aliyun.com/ubuntu/ jammy-backports main restricted universe multiverse \ndeb-src http://mirrors.aliyun.com/ubuntu/ jammy-backports main restricted universe multiverse" /etc/apt/sources.list
+
+sudo apt-get upgrade -y && apt-get update -y
+\end{lstlisting}
+
+\subsection*{Qemu安装}
+
+\begin{lstlisting}[language=bash, caption = Qemu安装]
+git clone https://gitlab.com/whale4/qemu.git # git command required
+
+# 需要的依赖
+sudo apt install autoconf automake autotools-dev curl libmpc-dev libmpfr-dev libgmp-dev  \               
+    gawk build-essential bison flex texinfo gperf libtool patchutils bc \
+    zlib1g-dev libexpat-dev pkg-config  libglib2.0-dev libpixman-1-dev libsdl2-dev \
+    git tmux python3 python3-pip ninja-build
+
+# 安装
+
+cd qemu
+mkdir build && cd build
+../configure --target-list=riscv64-softmmu, riscv64-linux-user
+make
+\end{lstlisting}
+
+\subsection*{Rust安装}
+
+\begin{lstlisting}[language=bash, caption = Rust安装]
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+\end{lstlisting}
+
+
+\section*{Rust实现链表}
+
+\begin{lstlisting}
+struct List {
+    #[allow(unused)]
+    head: Option<NonNull<Entry>>,
+    tail: Option<NonNull<Entry>>,
+    start: Option<NonNull<Entry>>,
+    len: usize,
+    notified: usize,
+    cache_used: bool,
+}
+
+impl List {
+    /// 插入一个新的条目到链表
+    fn insert(&mut self, cache: NonNull<Entry>) -> NonNull<Entry> {
+        unsafe {
+            let entry = Entry {
+                state: Cell::new(State::Created),
+                prev: Cell::new(self.tail),
+                next: Cell::new(None),
+            };
+
+            let entry = if self.cache_used {
+                NonNull::new_unchecked(Box::into_raw(Box::new(entry)))
+            } else {
+                self.cache_used = true;
+                cache.as_ptr().write(entry);
+                cache
+            };
+
+            match mem::replace(&mut self.tail, Some(entry)) {
+                None => self.head = Some(entry),
+                Some(t) => t.as_ref().next.set(Some(entry)),
+            }
+
+            if self.start.is_none() {
+                self.start = self.tail;
+            }
+
+            self.len += 1;
+
+            entry
+        }
+    }
+
+    /// 从链表移除一个条目并且返回其的状态
+    fn remove(&mut self, entry: NonNull<Entry>, cache: NonNull<Entry>) -> State {
+        unsafe {
+            let prev = entry.as_ref().prev.get();
+            let next = entry.as_ref().next.get();
+
+            match prev {
+                None => self.head = next,
+                Some(p) => p.as_ref().next.set(next),
+            }
+
+            match next {
+                None => self.tail = prev,
+                Some(n) => n.as_ref().prev.set(prev),
+            }
+
+            if self.start == Some(entry) {
+                self.start = next;
+            }
+
+            let state = if ptr::eq(entry.as_ptr(), cache.as_ptr()) {
+                self.cache_used = false;
+                entry.as_ref().state.replace(State::Created)
+            } else {
+                Box::from_raw(entry.as_ptr()).state.into_inner()
+            };
+
+            if state.is_notified() {
+                self.notified -= 1;
+            }
+            self.len -= 1;
+
+            state
+        }
+    }
+
+    /// 通知一定数量的条目
+    #[cold]
+    fn notify(&mut self, mut n: usize) {
+        if n <= self.notified {
+            return;
+        }
+        n -= self.notified;
+        while n > 0 {
+            n -= 1;
+
+            match self.start {
+                None => break,
+                Some(e) => {
+                    let e = unsafe { e.as_ref() };
+                    self.start = e.next.get();
+
+                    match e.state.replace(State::Notified(false)) {
+                        State::Notified(_) => {}
+                        State::Created => {}
+                        State::Polling(w) => w.wake_by_ref(),
+                    }
+
+                    self.notified += 1;
+                }
+            }
+        }
+    }
+
+    /// 通知一定数量的 `additional` 条目
+    #[cold]
+    fn notify_additional(&mut self, mut n: usize) {
+        while n > 0 {
+            n -= 1;
+
+            match self.start {
+                None => break,
+                Some(e) => {
+                    let e = unsafe { e.as_ref() };
+                    self.start = e.next.get();
+
+                    match e.state.replace(State::Notified(true)) {
+                        State::Notified(_) => {}
+                        State::Created => {}
+                        State::Polling(w) => w.wake_by_ref(),
+                    }
+                    self.notified += 1;
+                }
+            }
+        }
+    }
+}
+\end{lstlisting}

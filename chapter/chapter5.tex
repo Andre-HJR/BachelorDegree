@@ -1,0 +1,133 @@
+\chapter{总结}
+\label{chap:Summary}
+
+\section{异步锁的思路}
+
+\begin{lstlisting}[caption=异步锁结构]
+pub struct AsyncMutex<T: ?Sized> {
+    state: AtomicUsize,
+    lock_ops: Event,
+    data: UnsafeCell<T>,
+}
+\end{lstlisting}
+
+其中 AsyncMutex 的底层依赖是 Event 。
+
+\begin{lstlisting}[caption=异步锁的工作机制, numbers=left, label=asyncmutex]
+async fn acquire_slow(&self){
+    loop {
+        let listener = self.lock_ops.listen();
+
+        match self
+            .state
+            .compare_exchange(0, 1, Ordering::Acquire, Ordering::Acquire)
+            .unwrap_or_else(|x| x)
+        {
+            0 => return,
+
+            1 => {}
+
+            _ => break,
+        }
+
+        listener.await;
+    }
+    // ...
+}
+\end{lstlisting}
+
+通过Event::listen()创建事件监听，从代码的第2行到第15行，如果异步锁没有被任何任务持有，则第一个尝试获取锁，当compare\_exchange的返回值为0时，则表示事件成功获取锁，代码第16行，listener.await则是等待锁的释放。 
+
+于是  
+\begin{lstlisting}[caption = 异步锁]
+pub async fn lock(&self) -> AsyncMutexGuard<'_, T> {
+        if let Some(guard) = self.try_lock() {
+            return guard;
+        }
+        self.acquire_slow().await;
+        AsyncMutexGuard(self)
+    }
+\end{lstlisting}
+
+异步的lock函数返回一个异步的锁结构，依赖于Rust的生命周期，其会在生命周期结束的时候被释放。
+
+
+\section{文件系统的异步改造}
+
+\subsection{如何泛化异步接口}
+
+Rust 的编译器默认并不支持 async trait function。 编译器会推荐使用 async-trait，但是经过其改装的 async trait并不是零开销的。其会将
+
+
+\begin{figure}[htbp]
+    \figureCapSet
+	\centering
+	\begin{minipage}{0.49\linewidth}%表示图片的占用那一列的宽度
+		\centering
+        \begin{lstlisting}[frame=none]
+#[async_trait]
+pub trait AsyncBlockDevice {
+    async fn read(&self, block_id: usize, buf: &mut [u8]);
+    async fn write(&self, block_id: usize, buf: &[u8]);
+}
+        \end{lstlisting}
+	\end{minipage}
+    \hfill
+	%\hfill表示横向排，两张图片会自动保证一定的距离
+    %\vfill表示自动排版，两张图片会自动保证一定的距离
+    %或者直接在这里加空格来增加图片之间的距离
+	\begin{minipage}{0.49\linewidth}
+		\centering
+        \begin{lstlisting}[frame=none]
+pub trait AsyncBlockDevice {
+    fn read(&self, block_id: usize, buf: &mut [u8]) -> Box<dyn Future<Output = Option<&[u8], &[u8])>>>;
+    fn write(&self, block_id: usize, buf: &[u8]) -> Box<dyn Future<Output = Option<&[u8], &[u8])>>>;
+}
+        \end{lstlisting}
+	\end{minipage}
+    \caption{async trait 对异步接口的处理}
+\end{figure}
+
+
+这里就有两层开销了：
+
+\begin{itemize}
+    \item 动态调度的开销 dyn Future。这意味着所有异步驱动设备的 read和write 函数都比较难做一些编译器的优化。
+    \item 内存分配的开销 Box。在键值存储里，read和write应该是一个会被经常调用的函数。trait 被 async-trait 改写成新的形式之后，每次调用read和write都需要在堆上新建一个对象。这会对程序的性能造成比较大的影响。
+\end{itemize}
+其实，Rust本身提供了泛型编程的思路，直接拿出一个可供参考的解答，对应上部分可以写出如下代码：
+
+
+\begin{lstlisting}[caption = AsyncBlockDevice的泛型异步接口]
+pub trait AsyncBlockDevice {
+    type NextFuture<'a> = impl Future<Output = Option<(&'a [u8], &'a [u8])>>;
+
+    fn read(&self, block_id: usize, buf: &mut [u8]) -> Self::NextFuture<'_>;
+    fn write(&self, block_id: usize, buf: &[u8]) -> Self::NextFuture<'_>;
+}
+\end{lstlisting}
+
+
+解释：
+
+\begin{itemize}
+    \item NextFuture 是由 read（或者 write）函数返回的，而正常实现的read（或者 write）函数，只能返回和\&self生命周期相同的引用。在NextFuture上标注生命周期，是为了保障Self 的生命周期至少和 NextFuture 的一样长。
+    \item read 和 write 的返回值，从代码中可以知道，两个函数的返回值是一个 Future，并不是一个常见的异步函数的返回值，因此需要使用async move返回一个闭包以满足异步函数的返回约束。
+    \item 既然 read 和 write 返回的是一个Future，而Rust函数是无法在其编译器中被识别为一个具体的类型的，因此，此处的NextFuture需要让编译器自动推导Feature的具体类型，通过 impl 告知编译器NextFuture相关函数的返回需要产生一个	Future。
+\end{itemize}
+
+\section{高阶线程通信}
+
+
+\subsection{Mach IPC}
+
+
+在Mach\pagescite{mach0}的微内核设计上， IPC是核心，而且是内核中最重要的组件。不同于支持IPC机制的操作系统，Mach提供了一个支持大多数操作系统的IPC机制。
+
+Mach IPC机制，将进程之间的通行做了更一层的抽象，将通行机制的基础定为消息传递。而消息的数据量可大可小，小到几个字节，大到整个地址空间。内核需要确保进行数据传输时无需进行不必要的数据复制，同时其应当提供安全可靠的的通信，当且仅当线程获取授权时，才能发送和接收消息。
+
+通信和内存管理时紧密相连的。IPC依赖于内存的写时复制进行大量数据的有效传递。
+
+IPC支持用户任务之间，以及用户和内核之间的通信，且适用于那些基于客户端-服务器模型的应用程序。
+
+可以将Mach IPC的设计思路平移到starfish中，为其可能拥有的网络服务提供更加健壮的底层通行依赖。

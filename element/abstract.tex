@@ -1,0 +1,21 @@
+% 中文摘要
+\setlength{\headheight}{1.5cm}
+
+\abstractcn
+
+ring\_scheduler: 自己的工作是继续tronado-os的工作， 实现一个类似 shared\_ scheduler 的ring\_scheduler，将其接入rCore并使得其可以工作在rCore中，并试着将其从内核模块中正交出来，形成一个独立的模块（Crate）。 而异步的设计往往需要底层硬件的支持， 因此需要完成对底层硬件的异步工作，而磁盘的读写被抽象为文件的读写，当硬件的异步完成时，需要对文件系统进行合理的改造使其能完成异步相应的工作需求。ring\_scheduler的接入需要在内核中实例化，提供相应的系统调用。
+
+模块化的设计：预先的设想只是将模块在语言静态编译时就完成所有模块的载入工作，但是得益于Theseus的启发，有考虑在所有模块正交完成之后，尝试动态的内核模块的载入，其核心是对每个模块的elf的解析，从而在内核运行时动态载入。上述两者的模块化思路，前者主要依赖于语言的编译时，其实质只是将杂糅在一起的模块通过正交，变成独立且具有层次的的依赖树，模块之间的依赖通过各自之间ABI的调用形成约束；后者主要依赖语言的运行时，是对模块的进一步抽象，因为依赖于语言的运行时，所以需要独立的可以管理模块的内核单元对模块进行树状管理。
+
+% 中文关键词
+\keywordscn\quad 操作系统；Rust；异步；模块化；IO
+% 英文摘要
+\abstracten
+
+ring\_scheduler: own work is to continue the work of tronado-os, implement a ring\_scheduler similar to shared\_scheduler, connect it to rCore and make it work in rCore, and try to orthogonalize it from the kernel module to form a separate module ( Crate). The asynchronous design often requires the support of the underlying hardware, so it is necessary to complete the asynchronous work on the underlying hardware, and the disk read/write is abstracted as a file read/write. When the asynchronous hardware is completed, the file system needs to be reasonably modified so that it can do the corresponding work asynchronously. ring\_scheduler access needs to be instantiated in the kernel, providing the corresponding system calls.
+
+Modular design: The preconceived idea is to load all modules at the time of static language compilation, but thanks to the inspiration of Theseus, it is considered to try to dynamically load kernel modules after all modules have been orthogonalized, with the core being the parsing of each module's elf so that it can be dynamically loaded at kernel runtime. The former relies mainly on the compile time of the language, which in essence is just an orthogonalization of the mixed modules into an independent and hierarchical dependency tree, where the dependencies between modules are bounded by the ABI calls between them. The latter mainly relies on the language runtime and is a further abstraction of the module.
+
+
+% 英文关键词
+\keywordsen\quad OS；Rust；Asynchronous；Modularity；IO
