@@ -110,6 +110,68 @@ SBI（Supervisor Binary Interface）是Supervisor Execution Environment (SEE)和
 
 \section{异步}
 
+Rust 语言以async/await的形式为协作式多任务处理提供了一流的支持。
+
+\subsection{Futrue}
+
+如下我们可以通过下面这个图理解Future
+
+\begin{figure}[htb]
+    \figureCapSet
+    \centering
+    \includegraphics[width=.8\linewidth]{figure/c2/breakfirstsequence.png}
+    \caption{Breakfirst的同步和异步}
+    \label{figure:c2breakfirstsequence}
+\end{figure}
+
+这张序列图显示了一个函数，该函数为eat函数。先执行了同步的eat\_milk和eat\_bread函数，又执行了async\_eat\_milk和async\_eat\_bread函数。先后两次同步和两次异步。
+
+
+在同步调用的时候，函数是排队执行的，从牛奶到面包是依次进行，在牛奶喝完之前，不可以啃面包，事情只能一步一步完成，而完成的信号就是相应函数的返回。
+
+
+在异步调用的时候，喝牛奶时，可以返回Futre，牛奶的工作会被置换到后台，然后掉起啃面包的行为，这个动作同样是异步的，换句话说，当面包的工作出现阻塞时，面包同样可以被置换到后台，让出资源。这样的工作使得相应函数可以更早地被执行，然后形成宏观上相应动作地并发执行，而无需在接收函数返回之前长时间的等待。
+
+\subsection{Rust中的Future}
+
+\begin{figure}[htbp]
+    \figureCapSet
+	\centering
+	\begin{minipage}{0.49\linewidth}%表示图片的占用那一列的宽度
+		\centering
+\begin{lstlisting}[frame=none]
+pub trait Future {
+    type Output;
+    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output>;
+}
+\end{lstlisting}
+	\end{minipage}
+    \hfill
+	%\hfill表示横向排，两张图片会自动保证一定的距离
+    %\vfill表示自动排版，两张图片会自动保证一定的距离
+    %或者直接在这里加空格来增加图片之间的距离
+	\begin{minipage}{0.49\linewidth}
+		\centering
+        \begin{lstlisting}[frame=none]
+pub enum Pool<T> {
+    Ready(T),
+    Pending,
+}
+        \end{lstlisting}
+	\end{minipage}
+    \caption{Rust's Future}
+\end{figure}
+
+在上述的代码中，Future的trait接口，Output将会被返回一个异步的值。例如在时序图中提到的async\_eat\_milk的返回值。 而poll函数返回的是一个可以被轮询检查自身状态的值，其具体的结构如上图右部分。 
+
+当poll返回的值Ready(T)时，函数将完成的值进行Poll的封装，返回其状态完成的变体。否则，将返回其其他状态的变体，向其范围内全局的调用者发出该工作尚未完成的信号。
+
+poll方法采用两个参数： self:Pin<\&mut Self>和cx: \&mut Context。前者的行为类似普通引用，只是将值固定到内存的位置。后者存在的目的时为了Waker的实例可以被异步任务接收。这使得异步任务可以发出信号，表面其此时的状态（完成或一部分已完成）。由于主任务知道其将在准备就绪时收到通知，因此不需要一遍一遍调用。
+
+\subsection{Future使用的例子}
+
+下面的代码可以看成是早餐的Rust伪码描述，伪码中省略了不必要的细节，只给了能够说明问题的框架
+
 \begin{lstlisting}[ caption = BREAKFIRST ]
 enum FoodState {
     Cooked,
@@ -127,7 +189,9 @@ async fn eat () {
 
 \end{lstlisting}
 
+\subsubsection{状态转换}
 
+在编译器的后台，上述的代码将会被转化为状态机，每个调用将会形成不同的状态，根据上述代码可以转化出下面的状态。每个状态表示函数中不同的暂停点。“开始”和“结束”状态表示函数在其执行的开始和结束时。“Waiting on Milk”状态表示函数当前正在等待第一个结果。同样，“Waiting on Bread”状态表示函数等待第二个结果的暂停点。状态机通过使每个调用成为可能的状态转换变为Rust的Future。
 
 \begin{figure}[htb]
     \figureCapSet
@@ -137,6 +201,14 @@ async fn eat () {
     \label{figure:c2breakfirststate}
 \end{figure}
 
+该图使用箭头表示状态开关，使用菱形表示替代方法。该图使用箭头表示状态开关，使用菱形表示替代方法。例如，牛奶没有喝完，则采用标记为“no”的路径，并达到“Waiting on Milk”状态。否则，将采用“是”路径。没有标题的小红色菱形表示函数eat的分支。
+
+我们看到第一次调用启动函数poll并让它运行，直到它到达尚未准备好的Future。如果路径上的所有Future都准备就绪，则该函数可以运行到“结束”状态，在该状态中，它返回包装在 Poll::Ready.否则，状态机将进入等待状态并返回Poll::Pending。在下一次调用时，状态机将从上次等待状态开始，并重试上次操作。
+
+
+\subsubsection{状态保存}
+
+为了能够从上一个等待状态继续，状态机必须在内部跟踪当前状态。此外，它必须保存下次调用时继续执行所需的所有变量。这就是编译器真正可以发光的地方：因为它知道何时使用哪些变量，因此它可以自动生成具有所需变量的结构。
 
 \begin{figure}[htbp]
     \figureCapSet
@@ -145,9 +217,9 @@ async fn eat () {
 		\centering
         \begin{lstlisting}[frame=none]
 async fn eating(min_energy: usize) -> String {
-    let food = async_eat("milk").await;
+    let food = async_eat_milk().await;
     if food.energy() < min_energy {
-        content + &async_eat("bread").await
+        content + &async_eat_bread().await
     } else {
         content
     }
@@ -172,10 +244,15 @@ enum BreakfirstStateMachine {
     \caption{Breakfirst的状态机描述和与之对应的可能状态}
 \end{figure}
 
+
+在编译器中， 可以尝试这样理解， eating函数将会生成上图右边的状态。在Start和WaitingOnMilk的状态下，需要将参数存储下来，为food.energy()和min\_energy的对对比做准备。WaitingOnMilk的状态将会被WaitingOnMilkState所记录，其将会被全局的调度器所调用。当状态机继续运行时，async\_eat\_milk需要再次轮询WaitingOnMilkState，因此需要保存它。
+
+为了使得描述方便， 每个状态都被定义一个单独的枚举变体（如上图右半部分），并将相应的状态结构作为字段添加到每个变体中。为了实现状态转换，编译器基于以下函数生成特征的实现：
+
 \begin{lstlisting}[caption=Breakfirst的状态转换]
 impl Future for BreakfirstStateMachine {
     type Output = String;
-    fn poll(self: Pin<&mut Self>, fo: &mut Food) -> Poll<Self::Output> {
+    fn poll(self: Pin<&mut Self>, en: &mut Energy) -> Poll<Self::Output> {
         loop {
             match self {
                 BreakfirstStateMachine::Start(state) => {}
@@ -187,3 +264,76 @@ impl Future for BreakfirstStateMachine {
     }
 }
 \end{lstlisting}
+
+Future的类型是因为它是函数的返回类型。为简单起见，我们只显示简化的代码，不处理Pin、所有权、生存期等。因此，此代码和以下代码应被视为伪代码，而不是直接使用。当然，真正的编译器生成的代码可以正确处理所有内容，尽管可能以不同的方式处理。
+
+
+为了使代码摘录保持较小，我们分别显示每个臂的代码。让我们从Start状态开始
+
+\begin{lstlisting}[caption = Start Branch]
+BreakfirstStateMachine::Start(state) => {
+    let eat_milk_future = async_eat_milk();
+    let state = WaitingOnMilkState {
+        min_energy: state.min_energy,
+        eat_milk_future,
+    }
+    *self = BreakfirstStateMachine::WaitingOnMilk(state);
+}
+\end{lstlisting}
+
+状态机处于函数开头的状态Start。在这种情况下，执行从函数体到第一个.await为了处理该操作，将状态机的状态更改为WaitingOnMilk，其中包括结构的构造。
+
+
+由于语句是在循环中执行的，因此执行跳转到接下来的状态：
+
+\begin{lstlisting}[caption=WaitingOnMilk Branch]
+BreakfirstStateMachine::WaitingOnMilk(state) => {
+    match state.eat_milk_future.poll(en) {
+        Poll::Pending => return Poll::Pending,
+        Poll::Ready(energy) => {
+            if food.energy() < state.min_energy {
+                let eat_bread_future = async_eat_bread();
+                let state = WaitingOnBreadState {
+                    energy,
+                    eat_bread_future,
+                }
+                *self = BreakfirstStateMachine::WaitingOnBread(state);
+            } else {
+                *self = BreakfirstStateMachine::End(EndState);
+                return Poll::Ready(energy);
+            }
+        }
+    }
+}
+\end{lstlisting}
+
+在这个分支中，首先调用Poll::Pending如果还没有准备好，我们退出循环并返回self, 由于在这种情况下保持该状态 WaitingOnMilk，因此状态机上的下一个调用将进入同一分支并再次轮询。
+
+准备就绪后，我们将结果分配给变量并继续执行函数的代码： 如果小于保存在状态结构中的值，则异步开始啃食面包。此时再次将操作转换为状态更改，这次转换为WaitingOnBread状态。由于正在执行内部循环，因此执行之后直接跳转到新状态的分支，然后再次轮询。
+
+如果我们进入条件的另一条分支，则不会发生进一步的操作。从而到达函数的末尾并返回包装在 Poll::Ready，并将当前状态更改为End状态。
+
+
+WaitingOnBread的代码如下:
+
+\begin{lstlisting}[caption=WaitingOnBread Branch]
+BreakfirstStateMachine::WaitingOnBread(state) => {
+    match state.async_eat_bread.poll(en) {
+        Poll::Pending => return Poll::Pending,
+        Poll::Ready(bread_energy) => {
+            *self = BreakfirstStateMachine::End(EndState);
+            return Poll::Ready(state.energy + &bread_energy);
+        }
+    }
+} 
+\end{lstlisting}
+与状态WaitingOnMilk类似，我们首先轮询async\_eat\_bread如果它仍然挂起，我们退出循环并返回Poll::Pending否则，我们可以执行函数的最后一个操作：将变量与将来的结果连接起来。我们将状态机更新为End状态，然后返回包装在Poll::Ready中的结果。
+
+最后的代码为
+
+\begin{lstlisting}[caption=End Branch]
+BreakfirstStateMachine::End(state) => {
+    panic!("poll called after Poll::Ready was returned");
+} 
+\end{lstlisting}
+Future返回后不应再次轮询，因此，如果在对于已经处于该状态时被调用，编译器应当抛出panic。

@@ -295,8 +295,8 @@
 \lstdefinestyle{mystyle}{ %
   basicstyle=
       % 2022-11-3 Andre \normalsize
-    % \ttfamily
-    \zihao{-4}
+    % \zihao{-4}
+    \ttfamily
     \lst@ifdisplaystyle\scriptsize\fi
 }
 \lstset{
