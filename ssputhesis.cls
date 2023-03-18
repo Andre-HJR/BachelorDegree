@@ -62,7 +62,7 @@
 
 \RequirePackage{xkeyval}
 % 2022-11-1 Andre 键值对设置（使用 \setkeys{} 设置文档内容）, 用于页面的设置
-\define@cmdkeys{ssputhesis}[ssputhesis@]{session, title, longtitle, titleen, institute, major, name, number, mentor, date, class}[none]
+\define@cmdkeys{ssputhesis}[ssputhesis@]{session, title, longtitle, titleen, institute, major, name, number, mentor, date, class, entry}[none]
 % 2022-11-1 Andre 对相关的键值进行初始化
 \setkeys{ssputhesis}{
     title=你还未设置论文题目,
@@ -72,6 +72,7 @@
     name=你的名字,
     class=你的班级,
     major=你还未设置专业,
+    entry=你还未填写入学年份,
     institute=你还没设置你的学院名称,
     session=入学时间,
     mentor=指导老师,
@@ -294,7 +295,8 @@
 \lstdefinestyle{mystyle}{ %
   basicstyle=
       % 2022-11-3 Andre \normalsize
-    \ttfamily
+    % \ttfamily
+    \zihao{-4}
     \lst@ifdisplaystyle\scriptsize\fi
 }
 \lstset{
@@ -421,10 +423,18 @@
 \providecommand{\append}{\chapter*{附录}\addcontentsline{toc}{chapter}{附\texorpdfstring{\quad}{}录}}
 
 
-
+\newif\ifduplicatecheck
 %% @title: \includefrontmatter
 %% @author: Andre
 %% @date: 2022-11-1
+\ifduplicatecheck
+\providecommand{\includefrontmatter}{
+\input{element/abstract.tex}
+\afterpage{\thispagestyle{empty}}
+\cleardoublepage
+}
+\endinput
+\else
 \providecommand{\includefrontmatter}{
 \setlength{\TPHorizModule}{0.8cm}  % textblock horiz length reference
 \setlength{\TPVertModule}{0.65cm}   % textblock verti length reference
@@ -448,7 +458,7 @@
         班\hspace{2\ccwd}级:            & \ssputhesis@class                      \\ \clineB{2-2}{2}
         专\hspace{2\ccwd}业:            & \ssputhesis@major                      \\ \clineB{2-2}{2}
         学部(院):\hspace{1\ccwd}        & \ssputhesis@institute                  \\ \clineB{2-2}{2}
-        入学时间:                       & \ssputhesis@session                    \\ \clineB{2-2}{2}
+        入学时间:                       & \ssputhesis@entry                    \\ \clineB{2-2}{2}
         指导教师:                       & \ssputhesis@mentor                     \\ \clineB{2-2}{2}
         日\hspace{2\ccwd}期:            &  \ssputhesis@date                      \\ %\clineB{2-2}{2}
         \end{tabular}
@@ -488,3 +498,4 @@
 }
 
 \endinput
+\fi

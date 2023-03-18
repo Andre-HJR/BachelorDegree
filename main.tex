@@ -9,6 +9,8 @@
 %
 %
 
+% 开启论文查重
+% \newif\ifduplicatecheck\duplicatechecktrue
 
 \UseRawInputEncoding
 % 屏蔽 由 `fontspec` 发出的字体警告
@@ -27,6 +29,7 @@
     major=软件工程, % 专业
     class=19软工A1,
     name=黄建荣,  % 姓名
+    entry=2021,
     number=20211313007, % 学号
     mentor=李丽萍,    % 指导教师
     date=\today   % 完成日期
@@ -56,6 +59,8 @@
 \input{chapter/chapter5} % 总结
 \let\cleardoublepage\clearpage
 
+\ifduplicatecheck
+\else
 % 盲审时将下面三行注释掉
 % \backmatter % 结尾内容
 \input{element/thanking} % 致谢
@@ -64,4 +69,5 @@
 \let\cleardoublepage\clearpage
 \input{element/appendix} % 附录
 \let\cleardoublepage\clearpage
+\fi
 \end{document}
