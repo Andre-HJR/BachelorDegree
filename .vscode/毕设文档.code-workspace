@@ -4,7 +4,9 @@
 			"path": ".."
 		}
 	],
-	"settings": {},
+	"settings": {
+		"latex-workshop.latex.autoBuild.run": "never",
+	},
 	"launch": {
 		"version": "0.2.0",
 		"configurations": [
