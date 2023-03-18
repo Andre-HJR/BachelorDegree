@@ -423,7 +423,6 @@
 \providecommand{\append}{\chapter*{附录}\addcontentsline{toc}{chapter}{附\texorpdfstring{\quad}{}录}}
 
 
-\newif\ifduplicatecheck
 %% @title: \includefrontmatter
 %% @author: Andre
 %% @date: 2022-11-1
