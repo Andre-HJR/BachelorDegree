@@ -8,8 +8,6 @@
 
 \subsection{进程通信}
 
-\subsubsection{哲学家就餐}
-
 \section{异步I/O}
 
 \subsection{ring\_scheduler}
@@ -20,7 +18,7 @@
 
 \subsection{静态模块}
 
-在动态模块的设计中，系统模块设计应当遵循以下原则：
+在静态模块的设计中，系统模块设计应当遵循以下原则：
 
 \begin{enumerate}
     \item 最小正交化的模块
@@ -30,10 +28,34 @@
 \subsubsection{最小正交的模块}
 
 
+\begin{figure}[htb]
+    \figureCapSet
+    \centering
+    \includegraphics[width=.8\linewidth]{figure/c3/starfishstructure.png}
+    \caption{Starfish 的静态模块分解图}
+    \label{figure:c3starfishstructure}
+\end{figure}
+
+参考\autoref{figure:c3starfishstructure}，这是最开始设计的内核模块的静态的拆分图。为了方便描述，每一层定义为抽象层级，处在最底层的其抽象层级为0，层级越低抽象的能力越小，反之则越大。而每一层的节点可以定义为抽象因子。例如，Starfish Config为0层的抽象因子，其寓意为在该层级的最小正交因子（即在当前的抽象下，该因子为最小的不可再分割的正交参考）。
+
+正交，顾名思义就是将一个复杂的“合力”,通过相应的参考系，进行有序分解，形成一个可以通过参考系中的相应因子描述的矢量，例如 $\boldsymbol {v}=(a, b)$， 则可以准确表述矢量$\boldsymbol {v}$在直角坐标系中的空间表示。同理$\boldsymbol{E}=(L, F)$则表述模块在层级间的空间表述，其中$\boldsymbol{E}$表示评估因子，L表示抽象层级，F表示抽象因子。由此可以总结出两组概念：最小正交化和严格最小正交化。
+
+\begin{enumerate}
+    \item 最小正交化： 当$L=0$时，即抽象层级为0，即模块不可再分的情况下， $\boldsymbol{E}$为最小正交化的评估因子，此时模块分解为最小正交化。
+    \item 严格最小正交化： 在满足最小正交化的前提下， 有$F = {F_{0}, F_{1}, \cdots, F_{n}}$，其中$0 = {F_{0} \cap F_{1} \cap \cdots \cap F_{n}}$, 此时， $\boldsymbol{E}$为严格正交化的评估因子，此时模块分解为严格最小正交化。
+\end{enumerate}
+
+当$\boldsymbol{E}$为严格正交化时，则可以说模块分解达到了一个最优的状态，此时所有的$L=0$级的模块之间不存在互相干扰的情况，彼此之间的联系，仅仅通过语言编程者之间的API约束，如此的好处可以使得模块之间的耦合程度变低，相互之间可以独立进行开发，同时如果他人的内核也遵循了相应的API约束，则该模块可以达到共享的目的。
 
 
 \subsubsection{树状依赖和空间隔离}
 
+
+通过\autoref{figure:c3starfishstructure}的观察，可以发现模块的分解和组合，其静态的模块将会形成一种树状的结果，此时L(即抽象层级)之间是存在“方向”的，即当存在$L_{i} < L_{j} (i < j)$时， $L_{j}$必然是由部分$L_{i}$组成，而必不可能存在上下互换的生成形式，如若L的层级方向出现错误，则$\boldsymbol{E}$将无法做出评估，其模块拆解也必然是错误的。由此，一个良好的模块分解必然会形成一个层次分明的树状依赖。
+
+当L一定， $F = {F_{0}, F_{1}, \cdots, F_{n}}$时， 若有$0 = {F_{0} \cap F_{1} \cap \cdots \cap F_{n}}$，此时的$\boldsymbol{E}$可以达到最优解，即优化评估因子，记作$\boldsymbol{OE}$，特别地当 $L = 0$时，若形成$\boldsymbol{OE}$，即$F$达到分解地最优解，则此时就可以称为严格最小正交化。
+
+其中$\boldsymbol{OE}$的意义是，层级间的依赖被解除，模块是独立，没有相互干扰, 可以达到层级空间间的空间隔离。同样以此可以逆向评估底层模块的$\boldsymbol{E}$特性， 通过数学归纳法，我们可以显而易见的得出当$L_{i} < L_{j} (i < j)$, 若$L_{j}$达到了$\boldsymbol{OE}$，则$L_{i}$也应当是$\boldsymbol{OE}$的。
 
 \subsection{动态模块}
 
