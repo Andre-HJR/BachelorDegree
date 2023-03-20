@@ -4,35 +4,58 @@
 \section{内核}
 
 \subsection{内存管理}
+
 \subsubsection{地址空间的映射}
 
-\begin{lstlisting}[caption=用户态对地址空间的映射]
+获取用户任务的一些信息， 
+\begin{lstlisting}[caption=用户任务信息获取]
 pub async fn prepare_user<S: Into<String>>(user: S, kernel_stack_top: usize) {
-    let user: String = user.into();
+    // ...
     let mut user_memory = load_user(&user).await;
     let user_asid = user_memory.address_space_id.into_inner();
     let swap_cx_va = VirtualAddress(swap_contex_va(user_asid));
     let swap_cx_vpn = VirtualPageNumber::floor(swap_cx_va);
-    let swap_cx_ppn = user_memory
-        .mapping
-        .translate(swap_cx_vpn)
-        .unwrap()
-        .page_number();
-    let swap_cx = unsafe {
-        (swap_cx_ppn .start_address() .0 .wrapping_add(KERNEL_MAP_OFFSET) as *mut trap::SwapContext) .as_mut() .unwrap()
-    };
-    let _user_satp = user_memory.mapping.get_satp(user_memory.address_space_id);
-    let user_stack_handle = user_memory .alloc_page_range(STACK_SIZE, Flags::READABLE | Flags::WRITABLE | Flags::USER) .expect("alloc user stack");
-
-    let user_stack_top = user_stack_handle.end.0;
-    assert!( KernelHartInfo::load_user_mm_set(user_memory), "try load memory set with exited");
-    let kernel_satp = satp::read().bits();
-    let tp = hart::read_tp();
-    *swap_cx = trap::SwapContext::new_to_user( kernel_satp, 0, tp, kernel_stack_top, user_stack_top, user_trap_handler as usize,);
-    swap_cx.set_gp(crate::SHAREDPAYLOAD_BASE);
-    swap_cx.set_tp(user_asid);
+    let swap_cx_ppn = user_memory.mapping.translate(swap_cx_vpn).unwrap().page_number();
+    // ...
 }
 \end{lstlisting}
+
+代码从上到下，依次异步创建用户态的地址空间的映射，记录用户的上下文的虚地址，记录上下文的虚拟页号，记录上下文的物理页号。
+
+\begin{lstlisting}[caption=向KernelHartInfo注入地址空间信息]
+pub fn load_user_mm_set(mm_set: MemorySet) -> bool {
+    use_tp_box_move(|b| {
+        let (link, _prev) = &mut b.user_mm_sets;
+        for set in link.iter() {
+            if set.address_space_id == mm_set.address_space_id {
+                return false;
+            }
+        }
+        link.push_back(mm_set);
+        true
+    })
+}
+\end{lstlisting}
+通过load\_user\_mm\_set将用户的地址空间的映射注入到KernelHartInfo，此时KernelHartInfo就携带了地址空间映射的信息，这样在跨越不同空间时其地址映射结构就会得到保存，在恢复上下文时，应用的物理的值就可以被正确找到。
+
+
+\begin{lstlisting}[caption=将地址空间信息传递给用户]
+pub async fn prepare_user<S: Into<String>>(user: S, kernel_stack_top: usize) {
+    // ...
+    *swap_cx = trap::SwapContext::new_to_user(
+        kernel_satp,
+        0,
+        tp,
+        kernel_stack_top,
+        user_stack_top,
+        user_trap_handler as usize,
+    );
+    // ...
+}
+    
+\end{lstlisting}
+
+此处，内核通过tp寄存器，将地址空间传递给用户，而在ring\_scheduler则通过gp寄存器将地址空间传递给用户。\verb|swap_cx.set_gp(SHAREDPAYLOAD_BASE)|。
 
 
 \subsubsection{内核态与用户态之间的转化}
@@ -41,10 +64,7 @@ pub async fn prepare_user<S: Into<String>>(user: S, kernel_stack_top: usize) {
 pub unsafe extern "C" fn supervisor_to_user() -> ! {
     core::arch::asm!(
         "csrw   satp, a1
-        sfence.vma", // 刷新页表
-        // 从 SwapContext 中恢复用户的上下文
-        // 将用户的 a0 寄存器保存在 sscratch 寄存器中，
-        // 这样子可以在最后一步将它和 a0（ctx） 进行交换
+        sfence.vma",
         "
         ld      t0, 9*8(a0)
         csrw    sscratch, t0
@@ -52,15 +72,14 @@ pub unsafe extern "C" fn supervisor_to_user() -> ! {
         "
         // ... 恢复通用寄存器的上下文 ...
         ",
-        // 恢复用户的 a0 寄存器，并且保存交换栈顶在 sscratch 寄存器中
         "csrrw  a0, sscratch, a0",
-        // 返回到用户态
         "sret",
         options(noreturn)
     )
 }
-
 \end{lstlisting}
+
+自\verb|sfence.vma|刷新页表之后，内核从SwapContext中恢复用户的上下文，将用户的a0寄存器保存在sscratch寄存器中，这样可以与最后一步的交换提供帮助，\verb|sret|则返回到用户态。
 
 
 用户态切换到内核态，用户态从这里开始陷入。函数指针在从内核态返回到用户态之前被写到 stvec 寄存器里面去，但是目前页表仍然还是用户态的页表。先对用户态的上下文进行保存，然后在进行页表的切换。
@@ -68,35 +87,29 @@ pub unsafe extern "C" fn supervisor_to_user() -> ! {
 \begin{lstlisting}[caption=由用户态进入内核态]
 pub unsafe extern "C" fn user_to_supervisor() -> ! {
     core::arch::asm!(
-        // 交换 a0 和 sscratch（原先保存着交换栈的栈顶指针）
         "csrrw  a0, sscratch, a0",
         "
         // ... 保存 SwapContext ..
     ",
-        // 保存用户的 a0 寄存器
         "csrr   t0, sscratch
-    sd      t0, 9*8(a0)",
-        // 写 sepc 寄存器到 SwapContext 中相应位置
+        sd      t0, 9*8(a0)",
         "csrr   t0, sepc
         sd      t0, 34*8(a0)",
-        // 恢复内核栈指针
         "ld     sp, 32*8(a0)",
-        // todo: 如何处理 tp 寄存器
         "ld     tp, 35*8(a0)",
-        // 将用户中断处理函数指针放到 t0 寄存器
         "ld     t0, 33*8(a0)",
-        // // 将用户的 satp 寄存器放到 t2 寄存器里面去
         // "csrr   t2, satp",
-        // 恢复内核页表
         "ld     t1, 31*8(a0)
         csrw    satp, t1",
         "sfence.vma",
-        // 跳转到中断处理函数
         "jr     t0",
         options(noreturn)
     );
 }
 \end{lstlisting}
+
+
+与内核态进入用户态的过程相似，首先保存交换栈的顶指针，将sepc寄存器写到SwapContext的相应位置之后，则恢复内核栈的指针，并将用户中断处理函数入口存入t0，和用户的satp寄存器存入t2，之后恢复内核的页表，最后进入中断处理函数。
 
 \subsection{进程通信}
 
@@ -247,7 +260,7 @@ pub unsafe extern "C" fn user_to_supervisor() -> ! {
 
 \section{异步调度}
 
-\subsection{用户空间的异步执行逻辑}
+\subsection{用户空间和内核空间的异步执行逻辑}
 
 \begin{lstlisting}[caption=用户空间的异步逻辑]
 pub fn execute_async() {
@@ -260,9 +273,7 @@ pub fn execute_async() {
 }
 \end{lstlisting}
 
-\subsection{内核空间的异步执行逻辑}
-
-这部分的逻辑，还没有实现。
+得益于共享调度的设计，ring\_scheduler的物理地址无论在内核空间还是用户空间都是可见的，因此内核和用户可以通过run\_until\_ready来执行相应的异步任务， 即从ring\_scheduler中获取任务， 将任务(指针)存入调度器，改变调度器中原有任务的任务状态。
 
 
 \subsection{异步事件的底层依赖: Event}
@@ -345,10 +356,8 @@ enum State {
 
 只用当状态为`State::Notified(bool)`的时候，事件才是被通知， 因此有如下的事件监听机制：
 
-\begin{lstlisting}[caption=Event的事件监听机制, numbers=left]
+\begin{lstlisting}[caption=Event的事件获取并判断事件是否完成]
 impl Future for EventListener {
-    type Output = ();
-
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut list = self.inner.lock();
 
@@ -356,8 +365,17 @@ impl Future for EventListener {
             None => unreachable!("cannot poll a completed `EventListener` future"),
             Some(entry) => entry,
         };
-        let state = unsafe { &entry.as_ref().state };
+        // ...
+    }
+}
+\end{lstlisting}
 
+
+\begin{lstlisting}[caption=Event的事件Poll机制]
+impl Future for EventListener {
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        // ...
+        let state = unsafe { &entry.as_ref().state };
         match state.replace(State::Notified(false)) {
             State::Notified(_) => {
                 list.remove(entry, self.inner.cache_ptr());
@@ -376,10 +394,10 @@ impl Future for EventListener {
                 }
             }
         }
-
         Poll::Pending
     }
 }
 \end{lstlisting}
 
-EventListener中的poll函数, 
+
+当获取事件的状态的可变引用时， 当章台为Polling和Created的时候，事件将会被加入到注册的waker序列中，当为Notified时，事件将会从序列中移除，然后释放相应的资源，并返回Ready告知任务已经完成，其余状态统一返回Pending
