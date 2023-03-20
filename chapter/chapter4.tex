@@ -3,9 +3,8 @@
 
 \section{内核}
 
-
-
-\subsection{地址空间的映射}
+\subsection{内存管理}
+\subsubsection{地址空间的映射}
 
 \begin{lstlisting}[caption=用户态对地址空间的映射]
 pub async fn prepare_user<S: Into<String>>(user: S, kernel_stack_top: usize) {
@@ -36,7 +35,7 @@ pub async fn prepare_user<S: Into<String>>(user: S, kernel_stack_top: usize) {
 \end{lstlisting}
 
 
-\subsection{内核态与用户态之间的转化}
+\subsubsection{内核态与用户态之间的转化}
 
 \begin{lstlisting}[caption=由内核态进入用户态]
 pub unsafe extern "C" fn supervisor_to_user() -> ! {
@@ -99,8 +98,172 @@ pub unsafe extern "C" fn user_to_supervisor() -> ! {
 }
 \end{lstlisting}
 
+\subsection{进程通信}
+
+\begin{table}[htb]
+    \tableCapSet    % 使用此命令调整 caption 间距
+    \caption{tiny 进程通信的系统调用}
+    \label{table:c4tinyprocesssyscall}
+    \centering
+    \zihao{5}
+    \begin{tabular}{c|c|c}
+        \hlineB{3}  % 线宽为3倍的横线
+        编号  & 系统调用               & 功能描述                \\
+        \hlineB{2}  % 线宽为2倍的横线
+            1 &sys\_yield &暂时放弃执行 \\
+            \hline
+            2 &sys\_getpid &获取进程id \\
+            \hline
+            3 &sys\_fork &创建子进程 \\
+            \hline
+            4 &sys\_exec &执行新程序 \\
+            \hline
+            5 &sys\_waitpid &等待子进程结束 \\
+            \hline
+            6 &sys\_pipe &创建管道 \\
+            \hline
+            7 &sys\_kill &发送信号给某进程 \\
+            \hline
+            8 &sys\_sigaction &设立信号处理例程 \\
+            \hline
+            9 &sys\_sigprocmask &设置要阻止的信号 \\
+            \hline
+            10 &sys\_sigreturn &从信号处理例程返回 \\
+            \hline
+            11 &sys\_sleep &进程休眠一段时间 \\
+            \hline
+        \hlineB{3}
+    \end{tabular}
+\end{table}
+
+
+\subsection{文件系统}
+
+\begin{table}[htb]
+    \tableCapSet    % 使用此命令调整 caption 间距
+    \caption{tiny 文件系统主要的系统调用}
+    \label{table:c4tinyfssyscall}
+    \centering
+    \zihao{5}
+    \begin{tabular}{c|c|c}
+        \hlineB{3}  % 线宽为3倍的横线
+        编号  & 系统调用               & 功能描述                \\
+        \hlineB{2}  % 线宽为2倍的横线
+            1 &sys\_write &输出字符串/写文件 \\
+            \hline
+            2 &sys\_read &读取字符串/读文件 \\
+            \hline
+            3 &sys\_open &打开/创建文件 \\
+            \hline
+            4 &sys\_close &关闭文件 \\
+            \hline
+        \hlineB{3}
+    \end{tabular}
+\end{table}
+
+\subsection{并发处理}
+
+\begin{table}[htb]
+    \tableCapSet    % 使用此命令调整 caption 间距
+    \caption{tiny 并发系统调用}
+    \label{table:c4tinyconcurrencysyscall}
+    \centering
+    \zihao{5}
+    \begin{tabular}{c|c|c}
+        \hlineB{3}  % 线宽为3倍的横线
+        编号  & 系统调用               & 功能描述                \\
+        \hlineB{2}  % 线宽为2倍的横线
+            1 &sys\_thread\_create &创建线程 \\
+            \hline
+            2 &sys\_gettid &获取线程id \\
+            \hline
+            3 &sys\_waittid &等待线程结束 \\
+        \hlineB{3}
+    \end{tabular}
+\end{table}
+
+\subsubsection{互斥锁}
+
+\begin{table}[htb]
+    \tableCapSet    % 使用此命令调整 caption 间距
+    \caption{tiny 锁机制系统调用}
+    \label{table:c4tinymutexsyscall}
+    \centering
+    \zihao{5}
+    \begin{tabular}{c|c|c}
+        \hlineB{3}  % 线宽为3倍的横线
+        编号  & 系统调用               & 功能描述                \\
+        \hlineB{2}  % 线宽为2倍的横线
+            1 &sys\_mutex\_create &创建锁 \\
+            \hline
+            2 &sys\_mutex\_lock &获取锁 \\
+            \hline
+            3 &sys\_mutex\_unlock &释放锁 \\
+        \hlineB{3}
+    \end{tabular}
+\end{table}
+
+\subsubsection{条件变量}
+
+\begin{table}[htb]
+    \tableCapSet    % 使用此命令调整 caption 间距
+    \caption{tiny 条件变量系统调用}
+    \label{table:c4tinycondvarsyscall}
+    \centering
+    \zihao{5}
+    \begin{tabular}{c|c|c}
+        \hlineB{3}  % 线宽为3倍的横线
+        编号  & 系统调用               & 功能描述                \\
+        \hlineB{2}  % 线宽为2倍的横线
+            1 &sys\_condvar\_create &创建条件变量 \\
+            \hline
+            2 &sys\_condvar\_signal &唤醒阻塞在条件变量上的线程 \\
+            \hline
+            3 &sys\_condvar\_wait &阻塞与此条件变量关联的当前线程 \\
+        \hlineB{3}
+    \end{tabular}
+\end{table}
+
+\subsubsection{信号量}
+
+\begin{table}[htb]
+    \tableCapSet    % 使用此命令调整 caption 间距
+    \caption{tiny 信号量系统调用}
+    \label{table:c4tinysemaphonesyscall}
+    \centering
+    \zihao{5}
+    \begin{tabular}{c|c|c}
+        \hlineB{3}  % 线宽为3倍的横线
+        编号  & 系统调用               & 功能描述                \\
+        \hlineB{2}  % 线宽为2倍的横线
+            1 &sys\_semaphore\_create &创建信号量 \\
+            \hline
+            2 &sys\_semaphore\_up &减少信号量的计数 \\
+            \hline
+            3 &sys\_semaphore\_down &增加信号量的计数 \\
+        \hlineB{3}
+    \end{tabular}
+\end{table}
 
 \section{异步调度}
+
+\subsection{用户空间的异步执行逻辑}
+
+\begin{lstlisting}[caption=用户空间的异步逻辑]
+pub fn execute_async() {
+    let shared_payload = unsafe { task::shared::SharedPayload::new(SHARED_PAYLOAD_BASE) };
+    task::shared::run_until_ready(
+        || unsafe { shared_payload.peek_task(task::shared::user_should_switch) },
+        |task_repr| unsafe { shared_payload.delete_task(task_repr) },
+        |task_repr, new_state| unsafe { shared_payload.set_task_state(task_repr, new_state) },
+    );
+}
+\end{lstlisting}
+
+\subsection{内核空间的异步执行逻辑}
+
+这部分的逻辑，还没有实现。
+
 
 \subsection{异步事件的底层依赖: Event}
 
@@ -220,5 +383,3 @@ impl Future for EventListener {
 \end{lstlisting}
 
 EventListener中的poll函数, 
-
-\section{模块化}
