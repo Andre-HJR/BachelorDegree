@@ -191,11 +191,171 @@ pub trait File: Send + Sync {
 
 信号量是操作系统中的一种同步原语，用于在多个线程或进程之间共享资源时进行互斥访问。它通常是一个整数值，用于计数指定数量的资源可用。当一个线程需要使用资源时，它会执行信号量的获取操作，如果信号量的值小于等于零，则线程将被挂起，（直到信号量的值变为正数，则会被唤醒）；否则将信号量的值减一，操作正常返回。另一方面，当一个线程完成使用资源后，它可以执行信号量的释放操作，将信号量的值加一，并唤醒一个或所有挂起的线程。
 
-\section{异步I/O}
+\section{异步调度}
 
 \subsection{ring\_scheduler}
 
+
+ring\_scheduler中的黑盒调度任务池资源，同时为内核和用户提供一系列的数据接口，实现任务资源在内核态和用户态两者之间的统一调度。
+
+\subsubsection{元数据}
+
+元数据是ring\_scheduler基本的调度单位
+
+\begin{itemize}
+\item hart\_id: 运行该任务的硬件线程编号，简单化为核的ID号
+\item address\_space\_id: 地址空间编号
+\item task\_repr: 任务指针，由所在的地址空间解释为任务
+\item state: 任务状态
+\end{itemize}
+
+
+address\_space\_id指示任务地址，在分页机制下，通过KernelHartInfo，取得地址空间的映射关系，找到任务执行的物理地址。
+
+task\_repr是任务指针，内核空间和用户空间的任务在ring\_scheduler由其指代，同时只有当task\_repr通过正确的地址转换才能得到正确的任务结构。
+
+如果task\_repr在其他地址空间尝试被解释，那么很可能会触发缺页异常，就算可以被转换，转换出来的数据也是不对的。这得益于指令集设计上的地址空间隔离的作用，可以实现一定的安全性保障。
+
+
+state标记这个任务的状态，至少会有两种状态的存在：就绪与睡眠。就绪状态的任务表示该任务的某个阶段已经准备好可以进一步执行；睡眠状态的任务表示该任务需要等待一些数据或者其他任务的完成，处于等待状态。
+
+就绪状态的任务可以被ring\_scheduler弹出交给内核或用户运行，睡眠状态的任务只有被唤醒器唤醒之后才能转成就绪状态，然后被进一步执行。
+
+\subsubsection{ring\_scheduler的接口}
+
+\begin{lstlisting}[caption=调度器的接口约束]
+pub trait Scheduler<T: Clone + PartialEq> {
+    type Priority;
+    fn add_task(&mut self, task: T) -> Option<T>;
+    fn peek_next_task(&self) -> Option<&T>;
+    fn peek_next_task_mut(&mut self) -> Option<&mut T>;
+    fn next_task(&mut self) -> Option<T>;
+    fn current_task(&self) -> Option<T>;
+    fn remove_task(&mut self, task: &T);
+    fn set_priority(&mut self, task: T, priority: Self::Priority);
+    fn queue_len(&self) -> Option<usize> {
+        None
+    }
+}
+\end{lstlisting}
+
+
+\begin{itemize}
+\item add\_task：尝试向调度器中添加一个任务
+\item peek\_next\_task：获取下一个任务不可变的引用
+\item peek\_next\_task\_mut：获取下一个任务可变的引用
+\item next\_task： 得到下一个任务
+\item current\_task：获取正在运行的当前任务，在发生中断时，通过这个保存任务的上下文
+\item remove\_task：从调度器中移除一个任务
+\item set\_priority： 设置任务的优先级，没有实现
+\item queue\_len：返回队列的长度，如果不存在，则返回None
+\end{itemize}
+
+
+\subsubsection{先来先服务的队列处理方式}
+
+这里采用最简单的任务调度算法，ring\_scheduler的底层实现了一个循环队列用以存储相应的任务结构，和相应的一些操作。底层队列的长度将是固定的，当队列中的任务处于唤醒时或队列已经放不下相应任务时，ring\_scheduler会将相应任务弹出，对于后者则阻止新任务的队列加入。
+
 \subsection{异步}
+
+调度器和执行器是分离的。调度器只根据元数据调度，得到下一个任务是什么。而这个任务该如何运行，调度器不知道，需要交给执行器来解释元数据的意义，拿到异步结构之后运行。
+
+\subsubsection{任务的状态}
+
+\begin{equation}
+    \label{equation:c3taskstate}
+    \begin{aligned}
+\boldsymbol{\mathrm{TaskState}} = (\mathrm{Ready}, \mathrm{Sleeping}, \mathrm{Finished})^{\boldsymbol{\mathrm{T}}}
+    \end{aligned}
+\end{equation}
+
+其中，任务有TaskRepr的指针传递进来， 其中如果状态为Ready时， 表示任务可以执行，应当被ring\_scheduler弹出。Sleeping则表示任务处于休眠状态， 当ring\_scheduler中的任务睡眠的程度到达内核约束的值或，应当由内核通过一定方式尝试唤醒适量的任务。最后， Finished则表示任务已经完成。
+
+\subsubsection{共享的数据}
+
+参考元数据， $\boldsymbol{\mathrm{Task}} := (\mathrm{hartId}, \mathrm{addressSpaceId}, \mathrm{taskRepr}, \mathrm{State})^{\mathrm{T}}$。为了使得内核和用户态的任务可以得到共享，因此内核态和用户态的任务都应当有如下描述：
+
+\begin{lstlisting}
+struct Task {
+    pub id: TaskId,
+    pub process: Arc<Process>,
+    pub inner: Mutex<TaskInner>,
+    pub future: Mutex<Pin<Box<dyn Future<Output = ()> + 'static + Send + Sync>>>, 
+}
+\end{lstlisting}
+
+\subsubsection{执行器的实现}
+
+由于调度器和执行器是分离的，调度器只知道任务的运行状态，而不知道该如何对任务进行操作。因此后半部分的工作将需要执行器的介入，而执行器的工作依赖于调度器的返回，若执行器返回遵循以下的规则
+
+\begin{equation}
+    \label{equation:c3schedulerreturn}
+    \begin{aligned}
+\boldsymbol{\mathrm{SchedulerReturn}} = (\mathrm{TaskRepr}, \mathrm{SholdYield}, \mathrm{NoWakeTask}, \mathrm{Finished})^{\mathrm{T}}
+    \end{aligned}
+\end{equation}
+
+其中
+
+\begin{itemize}
+    \item TaskRepr, 应当立即执行特定任务, 执行器从调度器获得这个值的时候需要调用相关方法释放任务,如果不释放任务，再次执行，还是会得到相同的任务。
+    \item ShouldYield, 其他地址空间的任务要运行，应当提示执行器主动让出，并携带下一个地址空间信息。这时候在用户态应该执行yield系统调用，yield系统调用将保存当前用户上下文，陷入内核并切换到下一个地址空间去运行。
+    \item  NoWakeTask，调度器里面没有醒着的任务，但存在睡眠的任务。
+    \item  Finished，队列已空，所有任务已经结束。
+\end{itemize}
+
+
+内核执行器的设计
+
+在一个大循环中，不断从共享调度器中拿到任务，对任务进行poll操作，如果返回Ready，从共享调度器中删除该任务，如果返回Pending，将该任务设置为睡眠状态。如果共享调度器中所有任务都已完成，则退出系统。
+
+\begin{lstlisting}[caption=内核执行器的设计]
+pub fn run_until_idle() {
+    loop {
+        let task = peek_task(); // 从共享调度器中拿出下一个任务的指针，不弹出
+        match task {
+            TaskResult::Task(task_repr: usize) => { // 任务指针
+                set_task_state(task_repr, TaskState::Sleeping); // 设置任务的状态为睡眠
+                let task: Arc<KernelTask> = unsafe { Arc::from_raw(task_repr as *mut _) };
+                // 注册 waker
+                let waker = waker_ref(&task);
+                let mut context = Context::from_waker(&*waker);
+                let ret = task.future.lock().as_mut().poll(&mut context);
+                if let Poll::Pending = ret {
+                    core::mem::forget(task); // 不要释放task的内存，它将继续保存在内存中被使用
+                } else {
+                    // 否则，从共享调度器中删除此任务
+                    delete_task(task_repr);
+                } // 隐含一个drop(task)
+            },
+            TaskResult::ShouldYield(next_asid: usize) => {...}, // 不同地址空间的任务，需要切换地址空间
+            TaskResult::NoWakeTask => {...},
+            TaskResult::Finished => {...}
+        }
+    }
+}
+\end{lstlisting}
+
+用户执行器的设计
+
+用户执行器的设计和内核执行器存在一点区别，就是当拿到不在当前地址空间的任务的时候，不释放这个任务的内存，执行切换地址空间的系统调用。
+
+\begin{lstlisting}[caption=用户执行器的设计]
+pub fn run_until_idle() {
+    loop {
+        let task = peek_task(); // 从共享调度器中拿出下一个任务的指针，不弹出
+        match task {
+            TaskResult::Task(task_repr: usize) => {...},
+            TaskResult::ShouldYield(next_asid: usize) => {
+                mem::forget(task);
+                do_yield(next_asid);
+            },
+            TaskResult::NoWakeTask => {...},
+            TaskResult::Finished => {...}
+        }
+    }
+}
+\end{lstlisting}
 
 \section{模块设计}
 
@@ -221,7 +381,19 @@ pub trait File: Send + Sync {
 
 参考\autoref{figure:c3starfishstructure}，这是最开始设计的内核模块的静态的拆分图。为了方便描述，每一层定义为抽象层级，处在最底层的其抽象层级为0，层级越低抽象的能力越小，反之则越大。而每一层的节点可以定义为抽象因子。例如，Starfish Config为0层的抽象因子，其寓意为在该层级的最小正交因子（即在当前的抽象下，该因子为最小的不可再分割的正交参考）。
 
-正交，顾名思义就是将一个复杂的“合力”,通过相应的参考系，进行有序分解，形成一个可以通过参考系中的相应因子描述的矢量，例如 $\boldsymbol {v}=(a, b)$， 则可以准确表述矢量$\boldsymbol {v}$在直角坐标系中的空间表示。同理$\boldsymbol{E}=(L, F)$则表述模块在层级间的空间表述，其中$\boldsymbol{E}$表示评估因子，L表示抽象层级，F表示抽象因子。由此可以总结出两组概念：最小正交化和严格最小正交化。
+正交，顾名思义就是将一个复杂的“合力”,通过相应的参考系，进行有序分解，形成一个可以通过参考系中的相应因子描述的矢量，例如 $\boldsymbol {v}=(a, b)$， 则可以准确表述矢量$\boldsymbol {v}$在直角坐标系中的空间表示。
+
+类比前者，提出抽象正交化的概念，我们将整个抽象空间则概括为由抽象层级和抽象因子组成的抽象评估空间，其空间的单位为抽象评估因子，则可以得到如下式子，
+
+
+\begin{equation}
+    \label{equation:c3elf}
+    \begin{aligned}
+       \boldsymbol{\mathrm{E}} = (L, F)
+    \end{aligned}
+\end{equation}
+
+其中$\boldsymbol{E}$表示评估因子，L表示抽象层级，F表示抽象因子。由此可以总结出两组概念：最小正交化和严格最小正交化。
 
 \begin{enumerate}
     \item 最小正交化： 当$L=0$时，即抽象层级为0，即模块不可再分的情况下， $\boldsymbol{E}$为最小正交化的评估因子，此时模块分解为最小正交化。
