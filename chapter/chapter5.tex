@@ -17,19 +17,13 @@ pub struct AsyncMutex<T: ?Sized> {
 async fn acquire_slow(&self){
     loop {
         let listener = self.lock_ops.listen();
-
-        match self
-            .state
-            .compare_exchange(0, 1, Ordering::Acquire, Ordering::Acquire)
-            .unwrap_or_else(|x| x)
+        match self.state.compare_exchange(0, 1, Ordering::Acquire, Ordering::Acquire)
+                .unwrap_or_else(|x| x)
         {
             0 => return,
-
             1 => {}
-
             _ => break,
         }
-
         listener.await;
     }
     // ...
