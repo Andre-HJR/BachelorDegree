@@ -115,7 +115,7 @@ pub unsafe extern "C" fn user_to_supervisor() -> ! {
 
 \begin{table}[htb]
     \tableCapSet    % 使用此命令调整 caption 间距
-    \caption{tiny 进程通信的系统调用}
+    \caption{tiny 进程通信的部分系统调用}
     \label{table:c4tinyprocesssyscall}
     \centering
     \zihao{5}
@@ -125,23 +125,11 @@ pub unsafe extern "C" fn user_to_supervisor() -> ! {
         \hlineB{2}  % 线宽为2倍的横线
             1 &sys\_yield &暂时放弃执行 \\
             \hline
-            2 &sys\_getpid &获取进程id \\
-            \hline
             3 &sys\_fork &创建子进程 \\
-            \hline
-            4 &sys\_exec &执行新程序 \\
-            \hline
-            5 &sys\_waitpid &等待子进程结束 \\
             \hline
             6 &sys\_pipe &创建管道 \\
             \hline
-            7 &sys\_kill &发送信号给某进程 \\
-            \hline
             8 &sys\_sigaction &设立信号处理例程 \\
-            \hline
-            9 &sys\_sigprocmask &设置要阻止的信号 \\
-            \hline
-            10 &sys\_sigreturn &从信号处理例程返回 \\
             \hline
             11 &sys\_sleep &进程休眠一段时间 \\
             \hline
@@ -149,6 +137,68 @@ pub unsafe extern "C" fn user_to_supervisor() -> ! {
     \end{tabular}
 \end{table}
 
+\begin{lstlisting}[caption=sys\_yield的系统调用]
+pub fn sys_yield() -> isize {
+    suspend_current_and_run_next();
+    0
+}
+\end{lstlisting}
+
+依赖于task模块实现的suspend\_current\_and\_run\_next，其将会暂停当前执行的任务，并在内核中查找下一个运行状态为Ready的应用并得到其ID，若没有找到，则返回一个None。
+
+\begin{lstlisting}[caption=sys\_fork的系统调用]
+pub fn sys_fork() -> isize {
+    let current_task = current_task().unwrap();
+    let new_task = current_task.fork();
+    let new_pid = new_task.pid.0;
+    let trap_cx = new_task.inner_exclusive_access().get_trap_cx();
+    trap_cx.x[10] = 0;  //x[10] is a0 reg
+    add_task(new_task);
+    new_pid as isize
+}
+\end{lstlisting}
+
+\begin{lstlisting}[caption=sys\_pipe的系统调用]
+pub fn sys_pipe(pipe: *mut usize) -> isize {
+    let task = current_task().unwrap();
+    let token = current_user_token();
+    let mut inner = task.acquire_inner_lock();
+    let (pipe_read, pipe_write) = make_pipe();
+    let read_fd = inner.alloc_fd();
+    inner.fd_table[read_fd] = Some(pipe_read);
+    let write_fd = inner.alloc_fd();
+    inner.fd_table[write_fd] = Some(pipe_write);
+    *translated_refmut(token, pipe) = read_fd;
+    *translated_refmut(token, unsafe { pipe.add(1) }) = write_fd;
+    0
+} 
+\end{lstlisting}
+
+\begin{lstlisting}[caption=sys\_sigactiion的系统调用]
+pub fn sys_sigaction(
+    signum: i32,
+    action: *const SignalAction,
+    old_action: *mut SignalAction,
+) -> isize {
+    let token = current_user_token();
+    let task = current_task().unwrap();
+    let mut inner = task.inner_exclusive_access();
+    if signum as usize > MAX_SIG {
+        return -1;
+    }
+    if let Some(flag) = SignalFlags::from_bits(1 << signum) {
+        if check_sigaction_error(flag, action as usize, old_action as usize) {
+            return -1;
+        }
+        let prev_action = inner.signal_actions.table[signum as usize];
+        *translated_refmut(token, old_action) = prev_action;
+        inner.signal_actions.table[signum as usize] = *translated_ref(token, action);
+        0
+    } else {
+        -1
+    }
+}
+\end{lstlisting}
 
 \subsection{文件系统}
 
@@ -162,10 +212,6 @@ pub unsafe extern "C" fn user_to_supervisor() -> ! {
         \hlineB{3}  % 线宽为3倍的横线
         编号  & 系统调用               & 功能描述                \\
         \hlineB{2}  % 线宽为2倍的横线
-            1 &sys\_write &输出字符串/写文件 \\
-            \hline
-            2 &sys\_read &读取字符串/读文件 \\
-            \hline
             3 &sys\_open &打开/创建文件 \\
             \hline
             4 &sys\_close &关闭文件 \\
@@ -173,6 +219,40 @@ pub unsafe extern "C" fn user_to_supervisor() -> ! {
         \hlineB{3}
     \end{tabular}
 \end{table}
+
+\begin{lstlisting}[caption=sys\_open的系统调用]
+pub fn sys_open(path: *const u8, flags: u32) -> isize {
+    let task = current_task().unwrap();
+    let token = current_user_token();
+    let path = translated_str(token, path);
+    if let Some(inode) = open_file(
+        path.as_str(),
+        OpenFlags::from_bits(flags).unwrap()
+    ) {
+        let mut inner = task.acquire_inner_lock();
+        let fd = inner.alloc_fd();
+        inner.fd_table[fd] = Some(inode);
+        fd as isize
+    } else {
+        -1
+    }
+}
+\end{lstlisting}
+
+\begin{lstlisting}[caption=sys\_close的系统调用]
+pub fn sys_close(fd: usize) -> isize {
+    let task = current_task().unwrap();
+    let mut inner = task.inner_exclusive_access();
+    if fd >= inner.fd_table.len() {
+        return -1;
+    }
+    if inner.fd_table[fd].is_none() {
+        return -1;
+    }
+    inner.fd_table[fd].take();
+    0
+}
+\end{lstlisting}
 
 \subsection{并发处理}
 
@@ -188,12 +268,44 @@ pub unsafe extern "C" fn user_to_supervisor() -> ! {
         \hlineB{2}  % 线宽为2倍的横线
             1 &sys\_thread\_create &创建线程 \\
             \hline
-            2 &sys\_gettid &获取线程id \\
-            \hline
-            3 &sys\_waittid &等待线程结束 \\
         \hlineB{3}
     \end{tabular}
 \end{table}
+
+\begin{lstlisting}[caption=sys\_thread\_create的系统调用]
+pub fn sys_thread_create(entry: usize, arg: usize) -> isize {
+    let task = current_task().unwrap();
+    let process = task.process.upgrade().unwrap();
+    // create a new thread
+    let new_task = Arc::new(TaskControlBlock::new(
+        Arc::clone(&process),
+        task.inner_exclusive_access().res.as_ref().unwrap().ustack_base,
+        true,
+    ));
+    // add new task to scheduler
+    add_task(Arc::clone(&new_task));
+    let new_task_inner = new_task.inner_exclusive_access();
+    let new_task_res = new_task_inner.res.as_ref().unwrap();
+    let new_task_tid = new_task_res.tid;
+    let mut process_inner = process.inner_exclusive_access();
+    // add new thread to current process
+    let tasks = &mut process_inner.tasks;
+    while tasks.len() < new_task_tid + 1 {
+        tasks.push(None);
+    }
+    tasks[new_task_tid] = Some(Arc::clone(&new_task));
+    let new_task_trap_cx = new_task_inner.get_trap_cx();
+    *new_task_trap_cx = TrapContext::app_init_context(
+        entry,
+        new_task_res.ustack_top(),
+        kernel_token(),
+        new_task.kstack.get_top(),
+        trap_handler as usize,
+    );
+    (*new_task_trap_cx).x[10] = arg;
+    new_task_tid as isize
+}
+\end{lstlisting}
 
 \subsubsection{互斥锁}
 
@@ -208,55 +320,104 @@ pub unsafe extern "C" fn user_to_supervisor() -> ! {
         编号  & 系统调用               & 功能描述                \\
         \hlineB{2}  % 线宽为2倍的横线
             1 &sys\_mutex\_create &创建锁 \\
-            \hline
-            2 &sys\_mutex\_lock &获取锁 \\
-            \hline
-            3 &sys\_mutex\_unlock &释放锁 \\
         \hlineB{3}
     \end{tabular}
 \end{table}
+\begin{lstlisting}[caption=sys\_mutex\_create的系统调用]
+pub fn sys_mutex_create(blocking: bool) -> isize {
+    let process = current_process();
+    let mutex: Option<Arc<dyn Mutex>> = if !blocking {
+        Some(Arc::new(MutexSpin::new()))
+    } else {
+        Some(Arc::new(MutexBlocking::new()))
+    };
+    let mut process_inner = process.inner_exclusive_access();
+    if let Some(id) = process_inner
+        .mutex_list
+        .iter()
+        .enumerate()
+        .find(|(_, item)| item.is_none())
+        .map(|(id, _)| id)
+    {
+        process_inner.mutex_list[id] = mutex;
+        id as isize
+    } else {
+        process_inner.mutex_list.push(mutex);
+        process_inner.mutex_list.len() as isize - 1
+    }
+}
+\end{lstlisting}
 
 \subsubsection{条件变量}
 
-\begin{table}[htb]
-    \tableCapSet    % 使用此命令调整 caption 间距
-    \caption{tiny 条件变量系统调用}
-    \label{table:c4tinycondvarsyscall}
-    \centering
-    \zihao{5}
-    \begin{tabular}{c|c|c}
-        \hlineB{3}  % 线宽为3倍的横线
-        编号  & 系统调用               & 功能描述                \\
-        \hlineB{2}  % 线宽为2倍的横线
-            1 &sys\_condvar\_create &创建条件变量 \\
-            \hline
-            2 &sys\_condvar\_signal &唤醒阻塞在条件变量上的线程 \\
-            \hline
-            3 &sys\_condvar\_wait &阻塞与此条件变量关联的当前线程 \\
-        \hlineB{3}
-    \end{tabular}
-\end{table}
+\begin{lstlisting}[caption=条件变量的实现]
+impl Condvar {
+    pub fn new() -> Self {
+        Self {
+            inner: unsafe {
+                UPIntrFreeCell::new(CondvarInner {
+                    wait_queue: VecDeque::new(),
+                })
+            },
+        }
+    }
+    pub fn signal(&self) {
+        let mut inner = self.inner.exclusive_access();
+        if let Some(task) = inner.wait_queue.pop_front() {
+            wakeup_task(task);
+        }
+    }
+    pub fn wait_no_sched(&self) -> *mut TaskContext {
+        self.inner.exclusive_session(|inner| {
+            inner.wait_queue.push_back(current_task().unwrap());
+        });
+        block_current_task()
+    }
+    pub fn wait_with_mutex(&self, mutex: Arc<dyn Mutex>) {
+        mutex.unlock();
+        self.inner.exclusive_session(|inner| {
+            inner.wait_queue.push_back(current_task().unwrap());
+        });
+        block_current_and_run_next();
+        mutex.lock();
+    }
+}
+\end{lstlisting}
 
 \subsubsection{信号量}
 
-\begin{table}[htb]
-    \tableCapSet    % 使用此命令调整 caption 间距
-    \caption{tiny 信号量系统调用}
-    \label{table:c4tinysemaphonesyscall}
-    \centering
-    \zihao{5}
-    \begin{tabular}{c|c|c}
-        \hlineB{3}  % 线宽为3倍的横线
-        编号  & 系统调用               & 功能描述                \\
-        \hlineB{2}  % 线宽为2倍的横线
-            1 &sys\_semaphore\_create &创建信号量 \\
-            \hline
-            2 &sys\_semaphore\_up &减少信号量的计数 \\
-            \hline
-            3 &sys\_semaphore\_down &增加信号量的计数 \\
-        \hlineB{3}
-    \end{tabular}
-\end{table}
+\begin{lstlisting}[caption=信号量的实现]
+impl Semaphore {
+    pub fn new(res_count: usize) -> Self {
+        Self {
+            inner: unsafe {
+                UPIntrFreeCell::new(SemaphoreInner {
+                    count: res_count as isize,
+                    wait_queue: VecDeque::new(),
+                })
+            },
+        }
+    }
+    pub fn up(&self) {
+        let mut inner = self.inner.exclusive_access();
+        inner.count += 1;
+        if inner.count <= 0 {
+            if let Some(task) = inner.wait_queue.pop_front() {
+                wakeup_task(task);
+            }
+        }
+    }
+    pub fn down(&self) {
+        let mut inner = self.inner.exclusive_access();
+        inner.count -= 1;
+        if inner.count < 0 {
+            inner.wait_queue.push_back(current_task().unwrap());
+            drop(inner);
+            block_current_and_run_next();
+        }
+    }
+}
+\end{lstlisting}
 
 \section{异步调度}
 
