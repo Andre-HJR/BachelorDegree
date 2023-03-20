@@ -422,6 +422,43 @@
 \providecommand{\thanking}{\chapter*{致谢}\addcontentsline{toc}{chapter}{致\texorpdfstring{\quad}{}谢}}
 \providecommand{\append}{\chapter*{附录}\addcontentsline{toc}{chapter}{附\texorpdfstring{\quad}{}录}}
 
+\renewcommand\listfigurename{\Heiti\bfseries\zihao{-4}{插\ 图\ 索\ 引}}
+\renewcommand\listtablename{\Heiti\bfseries\zihao{-4}{图\ 表\ 索\ 引}}
+
+\newbox\savedeqs %% <- box register that will store your equations
+\makeatletter %% <- change @ so that it can be used in command names
+\newcommand\saveandprinteq[1]{% %% <- saves equation in a box register, then prints it
+  \begingroup
+    \expandafter\let\csname \@currenvir\expandafter\endcsname\csname listeq@\@currenvir\endcsname
+    \expandafter\let\csname end\@currenvir\expandafter\endcsname\csname listeq@end\@currenvir\endcsname
+    %% ^^ restore original environment definitions
+    \edef\listeq@temp{% %% <- the full environment, with its original name
+      \noexpand\begin{\@currenvir}%
+        \unexpanded{#1}%
+      \noexpand\end{\@currenvir}%
+    }%
+    \savecounters@ %% <- store counter values
+      \global\setbox\savedeqs=\vbox{\unvbox\savedeqs\listeq@temp}% %% <- append to \savedeqs
+    \restorecounters@ %% <- restore them
+    \listeq@temp %% <- print the environment
+  \endgroup
+}
+\newcommand*\listeqpatch[1]{% %% <- patches equation environment
+  \expandafter\let\csname listeq@#1\expandafter\endcsname\csname #1\endcsname
+  \expandafter\let\csname listeq@end#1\expandafter\endcsname\csname end#1\endcsname
+  \renewenvironment{#1}{\collect@body\saveandprinteq}{}%
+}
+\newcommand\listofequations{ %% <- prints the list of equations
+  \section*{\Heiti\bfseries\zihao{-4}{公\ 式\ 索\ 引}}
+  \unvbox\savedeqs
+}
+
+\listeqpatch{equation}
+\listeqpatch{align}
+\listeqpatch{gather}
+\listeqpatch{multline}
+\listeqpatch{flalign}
+
 
 %% @title: \includefrontmatter
 %% @author: Andre
