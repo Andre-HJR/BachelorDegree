@@ -3,18 +3,7 @@
 
 \section{内核}
 
-\subsection{KernelHartInfo}
-\begin{lstlisting}[caption=KernelHartInfo的结构]
-#[repr(C)]
-pub struct KernelHartInfo {
-    hart_id: usize,
-    // ...
-    asid_alloc: (LinkedList<usize>, usize),   // (空余的编号回收池，目前已分配最大的编号)
-    user_mm_sets: (LinkedList<MemorySet>, usize), // (注册的用户地址空间映射，上一次进入的用户地址空间编号)
-}
-\end{lstlisting}
 
-KernelHartInfo游走在内核态和用户态之间。记录了如CPU的核心编号， 用户空间的地址映射信息，地址分配的信息等等。
 
 \subsection{地址空间的映射}
 
