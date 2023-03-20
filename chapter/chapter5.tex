@@ -116,7 +116,7 @@ pub trait AsyncBlockDevice {
     \item 既然 read 和 write 返回的是一个Future，而Rust函数是无法在其编译器中被识别为一个具体的类型的，因此，此处的NextFuture需要让编译器自动推导Feature的具体类型，通过 impl 告知编译器NextFuture相关函数的返回需要产生一个	Future。
 \end{itemize}
 
-\section{高阶线程通信}
+\section{高阶进程通信}
 
 
 \subsection{Mach IPC}
