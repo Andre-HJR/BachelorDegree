@@ -303,7 +303,7 @@ pub fn sys_thread_create(entry: usize, arg: usize) -> isize {
 \subsubsection{互斥锁}
 
 
-在进程控制块中存有mutex\_list，其类型为Vec<Option<Arc<dyn Mutex>>>，数组构建一个含有多个可空槽位且槽位数可以拓展的互斥锁表，表中的每个元素都实现了 Mutex Trait ，是一种互斥锁实现。
+在进程控制块中存有mutex\_list，其类型为Vec<Option<Arc<dyn Mutex > > >，数组构建一个含有多个可空槽位且槽位数可以拓展的互斥锁表，表中的每个元素都实现了 Mutex Trait ，是一种互斥锁实现。
 
 \begin{lstlisting}[caption=互斥锁的实现]
 impl Mutex for MutexBlocking {
@@ -337,7 +337,7 @@ impl Mutex for MutexBlocking {
 
 \subsubsection{条件变量}
 
-在进程控制块中存有condvar\_list，其类型为Vec<Option<Arc<Condvar>>>，Condvar的内部基于一个阻塞队列。
+在进程控制块中存有condvar\_list，其类型为Vec<Option<Arc<Condvar > > >，Condvar的内部基于一个阻塞队列。
 
 \begin{lstlisting}[caption=条件变量的实现]
 impl Condvar {
@@ -370,7 +370,7 @@ signal 从阻塞队列中移除一个线程并调用唤醒原语 wakeup\_task �
 
 \subsubsection{信号量}
 
-在进程控制块中存有semaphore\_list，其类型为Vec<Option<Arc<Semaphore>>>，Condvar的内部基于一个阻塞队列，还存在一个计数变量（即信号量基本思路中的整数变量 S）。信号量 Semaphore 支持三种操作：创建 new （带有一个参数 res\_count ，也即信号量初始可用资源数量 
+在进程控制块中存有semaphore\_list，其类型为Vec<Option<Arc<Semaphore > > >，Condvar的内部基于一个阻塞队列，还存在一个计数变量（即信号量基本思路中的整数变量 S）。信号量 Semaphore 支持三种操作：创建 new （带有一个参数 res\_count ，也即信号量初始可用资源数量 
  ）以及 up （也即 V 操作）和 down （也即 P 操作）。
 
 \begin{lstlisting}[caption=信号量的实现]
