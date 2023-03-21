@@ -4,6 +4,80 @@
 
 \section{系统内核}
 
+\subsection{内核提供的系统调用}
+\begin{table}[htb]
+    \tableCapSet    % 使用此命令调整 caption 间距
+    \caption{tiny 系统调用}
+    \label{table:c3tinysyscall}
+    \centering
+    \zihao{5}
+    \begin{tabular}{c|c|c}
+        \hlineB{3}  % 线宽为3倍的横线
+        编号  & 系统调用               & 功能描述                \\
+        \hlineB{2}  % 线宽为2倍的横线
+            1&sys\_exit&结束执行 \\
+            \hline
+            2&sys\_write&输出字符串/写文件 \\
+            \hline
+            3&sys\_yield&暂时放弃执行 \\
+            \hline
+            4&sys\_get\_time&获取当前时间 \\
+            \hline
+            5&sys\_getpid&获取进程id \\
+            \hline
+            6&sys\_fork&创建子进程 \\
+            \hline
+            7&sys\_exec&执行新程序 \\
+            \hline
+            8&sys\_waitpid&等待子进程结束 \\
+            \hline
+            9&sys\_read&读取字符串/读文件 \\
+            \hline
+            10&sys\_open&打开/创建文件 \\
+            \hline
+            11&sys\_close&关闭文件 \\
+            \hline
+            12&sys\_dup&复制文件描述符 \\
+            \hline
+            13&sys\_pipe&创建管道 \\
+            \hline
+            14&sys\_kill&发送信号给某进程 \\
+            \hline
+            15&sys\_sigaction&设立信号处理例程 \\
+            \hline
+            16&sys\_sigprocmask&设置要阻止的信号 \\
+            \hline
+            17&sys\_sigreturn&从信号处理例程返回 \\
+            \hline
+            18&sys\_sleep&进程休眠一段时间 \\
+            \hline
+            19&sys\_thread\_create&创建线程 \\
+            \hline
+            20&sys\_gettid&获取线程id \\
+            \hline
+            21&sys\_waittid&等待线程结束 \\
+            \hline
+            22&sys\_mutex\_create&创建锁 \\
+            \hline
+            23&sys\_mutex\_lock&获取锁 \\
+            \hline
+            24&sys\_mutex\_unlock&释放锁 \\
+            \hline
+            25&sys\_semaphore\_create&创建信号量 \\
+            \hline
+            26&sys\_semaphore\_up&减少信号量的计数 \\
+            \hline
+            27&sys\_semaphore\_down&增加信号量的计数 \\
+            \hline
+            28&sys\_condvar\_create&创建条件变量 \\
+            \hline
+            29&sys\_condvar\_signal&唤醒阻塞在条件变量上的线程 \\
+            \hline
+            30&sys\_condvar\_wait&阻塞与此条件变量关联的当前线程 \\
+        \hlineB{3}
+    \end{tabular}
+\end{table}
+
 \subsection{内存管理}
 
 从应用程序的视角中，动态内存分配中的内存，依赖于操作系统管理的“堆 （Heap）”。操作系统，需要其能提供动态内存分配。其设计上应当有如下功能：
