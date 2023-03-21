@@ -158,6 +158,8 @@ pub fn sys_fork() -> isize {
 }
 \end{lstlisting}
 
+new\_task的执行环境是从当前进程（父进程）中复制相关的环境, current\_ task.fork()这个动作会复制父进程的地址空间，同时会将父进程的弱引用计数存放到子进程的进程控制块中。\verb|trap_cx.x[10] = 0|子进程的 Trap 上下文中用来存放系统调用返回值的 a0 寄存器修改为 0 。而\verb|inner_exclusive_access|则将会返回一个可变引用的内部任务控制块。
+
 \begin{lstlisting}[caption=sys\_pipe的系统调用]
 pub fn sys_pipe(pipe: *mut usize) -> isize {
     let task = current_task().unwrap();
@@ -173,6 +175,8 @@ pub fn sys_pipe(pipe: *mut usize) -> isize {
     0
 } 
 \end{lstlisting}
+
+\verb|make\_pipe|可以创建一个管道并获取管道的读写端，而inner.fd\_table[write\_fd] = Some(pipe\_write)则分别为管道的读端和写端分配文件描述符并将它们放置在文件描述符表中的相应位置，而在sys\_pipe的最后则是将读端和写端的文件描述符写回到应用地址空间。
 
 \begin{lstlisting}[caption=sys\_sigactiion的系统调用]
 pub fn sys_sigaction(
@@ -199,6 +203,11 @@ pub fn sys_sigaction(
     }
 }
 \end{lstlisting}
+
+
+check\_sigaction\_error 用来检查 sigaction 的参数是否有错误（有错误的话返回 true）。这里的检查比较简单，如果传入的 action 或者 old\_action 为空指针则视为错误。另一种错误则是信号类型为 SIGKILL 或者 SIGSTOP 。
+
+sys\_sigaction 首先会调用 check\_sigactio\_error 进行检查，如果没有错误的话，则会使用 translated\_ref 将进程提交的信号处理例程保存到进程控制块，随后将此前的处理例程保存到进程中的指定位置。而保证translate\_ref能被正确调用的前提是类型 T 不会跨页，这将通过通过设置 SignalAction 对齐到 16 字节来保证这一点。
 
 \subsection{文件系统}
 
@@ -239,20 +248,8 @@ pub fn sys_open(path: *const u8, flags: u32) -> isize {
 }
 \end{lstlisting}
 
-\begin{lstlisting}[caption=sys\_close的系统调用]
-pub fn sys_close(fd: usize) -> isize {
-    let task = current_task().unwrap();
-    let mut inner = task.inner_exclusive_access();
-    if fd >= inner.fd_table.len() {
-        return -1;
-    }
-    if inner.fd_table[fd].is_none() {
-        return -1;
-    }
-    inner.fd_table[fd].take();
-    0
-}
-\end{lstlisting}
+其中，文件的的读写标记有OpenFlags::{RDONLY, WRONLY, RDWR, CREATE, TRUNC}，则可以通过open\_file基于EasyFileSystem对磁盘上进行文件的处理。open\_file将会接收两个参数，一个是文件名，关于文件名是一个比较泛化的概念，其文件名将会包含文件路径，在tiny的内核设计中，遵循了rCore的文件设计，处理文件的方式是通过ROOT\_INODE的根节点开始查找与之对应的文件，依次为基础对文件进行读写。
+
 
 \subsection{并发处理}
 
