@@ -297,64 +297,51 @@ pub fn sys_thread_create(entry: usize, arg: usize) -> isize {
 \item 线程的任务上下文：线程在内核态的寄存器信息，用于线程切换。
 \end{itemize}
 
-其中new\_task\_trap\_cx，则初始化位于该线程在用户态地址空间中的 Trap 上下文：设置线程的函数入口点和用户栈，使得第一次进入用户态时能从指定位置开始正确执行；设置好内核栈和陷入函数指针 trap_handler ，保证在 Trap 的时候用户态的线程能正确进入内核态。
+其中new\_task\_trap\_cx，则初始化位于该线程在用户态地址空间中的 Trap 上下文：设置线程的函数入口点和用户栈，使得第一次进入用户态时能从指定位置开始正确执行；设置好内核栈和陷入函数指针 trap\_handler ，保证在 Trap 的时候用户态的线程能正确进入内核态。
 
 
 \subsubsection{互斥锁}
 
-\begin{table}[htb]
-    \tableCapSet    % 使用此命令调整 caption 间距
-    \caption{tiny 锁机制系统调用}
-    \label{table:c4tinymutexsyscall}
-    \centering
-    \zihao{5}
-    \begin{tabular}{c|c|c}
-        \hlineB{3}  % 线宽为3倍的横线
-        编号  & 系统调用               & 功能描述                \\
-        \hlineB{2}  % 线宽为2倍的横线
-            1 &sys\_mutex\_create &创建锁 \\
-        \hlineB{3}
-    \end{tabular}
-\end{table}
 
-\begin{lstlisting}[caption=sys\_mutex\_create的系统调用]
-pub fn sys_mutex_create(blocking: bool) -> isize {
-    let process = current_process();
-    let mutex: Option<Arc<dyn Mutex>> = if !blocking {
-        Some(Arc::new(MutexSpin::new()))
-    } else {
-        Some(Arc::new(MutexBlocking::new()))
-    };
-    let mut process_inner = process.inner_exclusive_access();
-    if let Some(id) = process_inner
-        .mutex_list
-        .iter()
-        .enumerate()
-        .find(|(_, item)| item.is_none())
-        .map(|(id, _)| id)
-    {
-        process_inner.mutex_list[id] = mutex;
-        id as isize
-    } else {
-        process_inner.mutex_list.push(mutex);
-        process_inner.mutex_list.len() as isize - 1
+在进程控制块中存有mutex\_list，其类型为Vec<Option<Arc<dyn Mutex>>>，数组构建一个含有多个可空槽位且槽位数可以拓展的互斥锁表，表中的每个元素都实现了 Mutex Trait ，是一种互斥锁实现。
+
+\begin{lstlisting}[caption=互斥锁的实现]
+impl Mutex for MutexBlocking {
+    fn lock(&self) {
+        let mut mutex_inner = self.inner.exclusive_access();
+        if mutex_inner.locked {
+            mutex_inner.wait_queue.push_back(current_task().unwrap());
+            drop(mutex_inner);
+            block_current_and_run_next();
+        } else {
+            mutex_inner.locked = true;
+        }
+    }
+
+    fn unlock(&self) {
+        let mut mutex_inner = self.inner.exclusive_access();
+        assert!(mutex_inner.locked);
+        if let Some(waking_task) = mutex_inner.wait_queue.pop_front() {
+            wakeup_task(waking_task);
+        } else {
+            mutex_inner.locked = false;
+        }
     }
 }
 \end{lstlisting}
 
+对于 lock 来说，首先检查是否已经有线程在临界区中。如果 locked 为 true ，则将当前线程复制一份到阻塞队列中，然后调用 block\_current\_and\_run\_next 阻塞当前线程；否则当前线程可以进入临界区，将 locked 修改为 true 。
+
+对于 unlock 来说，简单起见，假定当前线程一定持有锁（也就是所有的线程一定将 lock 和 unlock 配对使用），因此断言 locked 为 true 。接下来尝试从阻塞队列中取出一个线程，如果存在的话就将这个线程唤醒。被唤醒的线程将继续执行 lock 并返回，进而回到用户态进入临界区。在此期间 locked 始终为 true ，相当于 释放锁的线程将锁直接移交给这次唤醒的线程 。反之，如果阻塞队列中没有线程的话，则将 locked 改成 false ，让后来的线程能够进入临界区。
+
+
 \subsubsection{条件变量}
+
+在进程控制块中存有condvar\_list，其类型为Vec<Option<Arc<Condvar>>>，Condvar的内部基于一个阻塞队列。
 
 \begin{lstlisting}[caption=条件变量的实现]
 impl Condvar {
-    pub fn new() -> Self {
-        Self {
-            inner: unsafe {
-                UPIntrFreeCell::new(CondvarInner {
-                    wait_queue: VecDeque::new(),
-                })
-            },
-        }
-    }
+    // ... 初始化阻塞队列 wait_queue ...
     pub fn signal(&self) {
         let mut inner = self.inner.exclusive_access();
         if let Some(task) = inner.wait_queue.pop_front() {
@@ -378,7 +365,13 @@ impl Condvar {
 }
 \end{lstlisting}
 
+
+signal 从阻塞队列中移除一个线程并调用唤醒原语 wakeup\_task 将其唤醒。wait 接收一个当前线程持有的锁作为参数。首先将锁释放，然后将当前线程挂在条件变量阻塞队列中，之后调用阻塞原语 block\_current\_and\_run\_next 阻塞当前线程。在被唤醒之后还需要重新获取锁，这样 wait 才能返回。
+
 \subsubsection{信号量}
+
+在进程控制块中存有semaphore\_list，其类型为Vec<Option<Arc<Semaphore>>>，Condvar的内部基于一个阻塞队列，还存在一个计数变量（即信号量基本思路中的整数变量 S）。信号量 Semaphore 支持三种操作：创建 new （带有一个参数 res\_count ，也即信号量初始可用资源数量 
+ ）以及 up （也即 V 操作）和 down （也即 P 操作）。
 
 \begin{lstlisting}[caption=信号量的实现]
 impl Semaphore {
@@ -412,6 +405,12 @@ impl Semaphore {
     }
 }
 \end{lstlisting}
+
+其实现逻辑：
+
+信号量相比互斥锁是一种更为强大和灵活的同步原语。它用来描述这样一种同步需求：初始状态下，某种资源的可用数量为一个非负整数$\boldsymbol{\mathrm{N}}$。
+
+整数变量count的含义如下：当count > 0时，表示还有count个可用资源；当count = 0时，表示所有可用资源恰好耗尽；当count < 0时，表示此时有count个线程被阻塞。显然count也应该被初始化为$\boldsymbol{\mathrm{N}}$。对于 down 操作，首先将 count减一，如果发现count < 0，说明之前 $\mathrm{count} \le 0$，一定没有可用资源了，于是需要阻塞当前线程；对于 up 操作，这里将count加一，可以这样理解：如果此时没有线程被阻塞则恢复 1 个可用资源；否则将阻塞线程数减少 1 ，因为当前线程将资源移交给了其中一个被阻塞的线程并唤醒了它。
 
 \section{异步调度}
 
