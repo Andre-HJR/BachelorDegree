@@ -184,9 +184,7 @@ pub fn sys_sigaction(
     action: *const SignalAction,
     old_action: *mut SignalAction,
 ) -> isize {
-    let token = current_user_token();
-    let task = current_task().unwrap();
-    let mut inner = task.inner_exclusive_access();
+    // ... 任务创建  ...
     if signum as usize > MAX_SIG {
         return -1;
     }
@@ -231,9 +229,7 @@ sys\_sigaction 首先会调用 check\_sigactio\_error 进行检查，如果没�
 
 \begin{lstlisting}[caption=sys\_open的系统调用]
 pub fn sys_open(path: *const u8, flags: u32) -> isize {
-    let task = current_task().unwrap();
-    let token = current_user_token();
-    let path = translated_str(token, path);
+    // ... 获取 task, path, user 的相关信息 ...
     if let Some(inode) = open_file(
         path.as_str(),
         OpenFlags::from_bits(flags).unwrap()
@@ -271,21 +267,7 @@ pub fn sys_open(path: *const u8, flags: u32) -> isize {
 
 \begin{lstlisting}[caption=sys\_thread\_create的系统调用]
 pub fn sys_thread_create(entry: usize, arg: usize) -> isize {
-    let task = current_task().unwrap();
-    let process = task.process.upgrade().unwrap();
-    // create a new thread
-    let new_task = Arc::new(TaskControlBlock::new(
-        Arc::clone(&process),
-        task.inner_exclusive_access().res.as_ref().unwrap().ustack_base,
-        true,
-    ));
-    // add new task to scheduler
-    add_task(Arc::clone(&new_task));
-    let new_task_inner = new_task.inner_exclusive_access();
-    let new_task_res = new_task_inner.res.as_ref().unwrap();
-    let new_task_tid = new_task_res.tid;
-    let mut process_inner = process.inner_exclusive_access();
-    // add new thread to current process
+    // ... 创建相关的任务，并将新的任务加入到内核的调用机制中 ...
     let tasks = &mut process_inner.tasks;
     while tasks.len() < new_task_tid + 1 {
         tasks.push(None);
@@ -304,6 +286,20 @@ pub fn sys_thread_create(entry: usize, arg: usize) -> isize {
 }
 \end{lstlisting}
 
+内核会为每个线程分配一组专属于该线程的资源：用户栈、Trap 上下文还有内核栈，前面两个在进程地址空间中，内核栈在内核地址空间中。这样这些线程才能相对独立地被调度和执行。相比于创建进程的 fork 系统调用，创建线程无需建立新的地址空间，
+
+线程创建有两种方式：第一种是在创建进程的时候默认为这个进程创建一个主线程（创建进程又分为若干种方式）；第二种是通过 thread\_create 系统调用在当前进程内创建一个新的线程。参考第二中方式，则在线程创建的时候需要注意保存如下信息： 
+
+\begin{itemize}
+\item 线程的用户态栈：确保在用户态的线程能正常执行函数调用；
+\item 线程的内核态栈：确保线程陷入内核后能正常执行函数调用；
+\item 线程共享的跳板页和线程独占的 Trap 上下文：确保线程能正确的进行用户态与内核态间的切换；
+\item 线程的任务上下文：线程在内核态的寄存器信息，用于线程切换。
+\end{itemize}
+
+其中new\_task\_trap\_cx，则初始化位于该线程在用户态地址空间中的 Trap 上下文：设置线程的函数入口点和用户栈，使得第一次进入用户态时能从指定位置开始正确执行；设置好内核栈和陷入函数指针 trap_handler ，保证在 Trap 的时候用户态的线程能正确进入内核态。
+
+
 \subsubsection{互斥锁}
 
 \begin{table}[htb]
@@ -320,6 +316,7 @@ pub fn sys_thread_create(entry: usize, arg: usize) -> isize {
         \hlineB{3}
     \end{tabular}
 \end{table}
+
 \begin{lstlisting}[caption=sys\_mutex\_create的系统调用]
 pub fn sys_mutex_create(blocking: bool) -> isize {
     let process = current_process();
