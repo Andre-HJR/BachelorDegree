@@ -3,19 +3,37 @@
 
 \abstractcn
 
-Ring\_scheduler: 自己的工作是继续tronado-os的工作， 实现一个类似 shared\_ scheduler 的ring\_scheduler，将其接入rCore并使得其可以工作在rCore中，并试着将其从内核模块中正交出来，形成一个独立的模块（Crate）。 而异步的设计往往需要底层硬件的支持， 因此需要完成对底层硬件的异步工作，而磁盘的读写被抽象为文件的读写，当硬件的异步完成时，需要对文件系统进行合理的改造使其能完成异步相应的工作需求。ring\_scheduler的接入需要在内核中实例化，提供相应的系统调用。
 
-模块化的设计：预先的设想只是将模块在语言静态编译时就完成所有模块的载入工作，但是得益于Theseus的启发，有考虑在所有模块正交完成之后，尝试动态的内核模块的载入，其核心是对每个模块的elf的解析，从而在内核运行时动态载入。上述两者的模块化思路，前者主要依赖于语言的编译时，其实质只是将杂糅在一起的模块通过正交，变成独立且具有层次的的依赖树，模块之间的依赖通过各自之间ABI的调用形成约束；后者主要依赖语言的运行时，是对模块的进一步抽象，因为依赖于语言的运行时，所以需要独立的可以管理模块的内核单元对模块进行树状管理。
+操作系统内核经历了几个主要的发展阶段，从裸机应用、批处理系统到多道任务系统，演变为至今主流的线程操作系统。这种系统基于线程的切换来调度任务；为了提升它的性能，有一些语言和编程架构，在应用层复用线程资源，提出了“协程”的概念，节省任务调度的开销。毕设工作尝试使得操作系统中不同资源被调度器所共享，调度器将所使用的资源同时共享给内核和用户，由此两者将拥有近乎相同的调度处理机制。同时，为了降低系统的耦合程度，尝试模块化系统内核，尝试将系统组件剥离。综上，工作如下：
+
+\begin{itemize}
+\item Ring\_scheduler: 自己的工作是继续tronado-os的工作， 实现一个类似 shared\_ scheduler 的ring\_scheduler，将其接入rCore并使得其可以工作在rCore中，并试着将其从内核模块中正交出来，形成一个独立的模块（Crate）。 
+
+\item 模块化的设计：模块化思路，主要依赖于语言的编译时，其实质是将杂糅在一起的模块通过正交，形成独立且具有层次的的依赖树，模块之间的设计依赖通过各自之间API的调用形成约束。
+\end{itemize}
+
+
+毕设的目标是尝试利用Rust语言和开源工具链，在操作系统内核中实现细粒度的并发安全、模块化。利用Rust的异步机制，优化操作系统内核的并发性能；利用编译工具Cargo，结合Rust的语言特性，尝试模块化系统内核，达到灵活组织内核组件。
 
 % 中文关键词
 \keywordscn\quad 操作系统；Rust；异步；模块化；IO
 % 英文摘要
 \abstracten
 
-Ring\_scheduler: own work is to continue the work of tronado-os, implement a ring\_scheduler similar to shared\_scheduler, connect it to rCore and make it work in rCore, and try to orthogonalize it from the kernel module to form a separate module ( Crate). The asynchronous design often requires the support of the underlying hardware, so it is necessary to complete the asynchronous work on the underlying hardware, and the disk read/write is abstracted as a file read/write. When the asynchronous hardware is completed, the file system needs to be reasonably modified so that it can do the corresponding work asynchronously. ring\_scheduler access needs to be instantiated in the kernel, providing the corresponding system calls.
+Operating system kernels have gone through several major stages of development, from bare-metal applications and batch systems to multi-channel
+task systems, evolving into the threaded operating systems that are dominant today. This system is based on thread switching to schedule tasks; to improve its performance, some languages and programming architectures have multiplexed thread resources at the application level and introduced the concept of "concurrency" to save the overhead of task scheduling. Bishop's work tries to make different resources in the operating system shared by the scheduler, which shares the used resources with both the kernel and the user, so that both will have nearly the same scheduling processing mechanism. Also, in order to reduce the coupling of the system, an attempt is made to modularize the system kernel and to try to strip the system components. In summary, the work is as follows.
 
-Modular design: The preconceived idea is to load all modules at the time of static language compilation, but thanks to the inspiration of Theseus, it is considered to try to dynamically load kernel modules after all modules have been orthogonalized, with the core being the parsing of each module's elf so that it can be dynamically loaded at kernel runtime. The former relies mainly on the compile time of the language, which in essence is just an orthogonalization of the mixed modules into an independent and hierarchical dependency tree, where the dependencies between modules are bounded by the ABI calls between them. The latter mainly relies on the language runtime and is a further abstraction of the module.
+\begin{itemize}
+\item Ring\_scheduler: Its own work is to continue the work of tronado-os and implement a ring\_scheduler similar to shared\_
+scheduler, plug it into rCore and make it work in rCore, and try to remove it from the kernel module.
+and try to orthogonalize it out of the kernel module to form a separate module (Crate).
 
+\item Modular design: The modular idea, which relies heavily on the compile time of the language, is essentially to form independent and hierarchical dependency trees by orthogonalizing modules together, with the design dependencies between modules bounded by API calls between them.
+\end{itemize}
+
+
+The goal of Bishop is to try to use the Rust language and open source toolchain to implement fine-grained concurrency-safe, modularization in the OS kernel.
+The goal of the project is to use the Rust language and open source toolchain to implement fine-grained concurrency safety and modularity in the OS kernel. We will use Rust's asynchronous mechanism to optimize the concurrency performance of the OS kernel, and use the compiler tool Cargo, combined with Rust's language features, to try to modularize the system kernel and achieve flexible organization of kernel components.
 
 % 英文关键词
 \keywordsen\quad OS；Rust；Asynchronous；Modularity；IO
