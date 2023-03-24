@@ -5,6 +5,8 @@
 
 \subsection{内存管理}
 
+除了设计中提到的关于Sv39的内存设计规范之外，由于内核和用户之间会通过ring\_scheduler共享相关的内存信息，因此需要通过KernelHartInfo记录空间跨越时，相应的地址映射，上下文等重要信息。
+
 \subsubsection{地址空间的映射}
 
 获取用户任务的一些信息， 
@@ -445,6 +447,8 @@ struct Inner {
 \end{lstlisting}
 
 Inner中的notified用于通知已被通知的Entry的数目，如果所有条目都被通知了，或者没有条目被通知，该值都会被设置为usize::MAX。而list则是用于指向已被注册的监听的链表， 而Mutex提供在多线程中list资源的锁机制，以解决资源竞争带来的数据冲突。
+
+基于设计的底层同步结构，事件库将提供事件原语和状态机制，以此为系统上层异步改造提供基础组件。
 
 \subsubsection{异步事件的一些原语}
 \label{sssec:event}

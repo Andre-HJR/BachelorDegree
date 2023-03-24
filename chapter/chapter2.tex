@@ -35,9 +35,10 @@ fn consume(owned_string: String) { }
 
 \subsection{Riscv}
 
+RISC-V\pagescite{riscv0}指令集是基于精简指令集计算(RISC)原理建立的开放指令集架构(ISA)，RISC-V是在指令集不断发展和成熟的基础上建立的全新指令。RISC-V指令集完全开源，设计简单，易于移植Unix系统，模块化设计，完整工具链，同时有大量的开源实现和流片案例，已在社区得到大力支持。由于操作系统依赖于底层的指令集设计规范，因此需要提前知晓Riscv的机器模式和其比较典型的内存设计方案Sv39\pagescite{xv60}的地址个俗称
 \subsubsection{Riscv的机器模式}
 
-risc-v\pagescite{riscv0}架构定义了3种工作模式，又称为特权模式（privileged mode）。
+risc-v架构定义了3种工作模式，又称为特权模式（privileged mode）。
 
 \begin{itemize}
     \item 机器模式（machine mode），简称M模式；
@@ -49,7 +50,7 @@ Riscv架构定义机器模式为必选模式，另外两种模式为可选模式
 
 SBI（Supervisor Binary Interface）是Supervisor Execution Environment (SEE)和supervisor之间的接口。 它允许主管通过使用 ecall 指令执行一些特权操作。 SEE 和 supervisor 的示例有：Unix 类平台上的 M-Mode 和 S-Mode，其中 SBI 是它们之间的唯一接口，以及 Hypervisor extended-Supervisor (HS) 和 Virtualized Supervisor (VS)。
 
-\subsubsection{Sv39\pagescite{xv60}}
+\subsubsection{Sv39}
 
 \textbf{地址格式与组成}
 
@@ -100,6 +101,8 @@ SBI（Supervisor Binary Interface）是Supervisor Execution Environment (SEE)和
 操作系统不能只提供面向单一编程语言的函数库的编程接口 (API, Application Programming Interface) ，它的接口需要考虑对基于各种编程语言的应用支持，以及访问安全等因素，使得应用软件不能像访问函数库一样的直接访问操作系统内部函数，更不能直接读写操作系统内部的地址空间。为此，操作系统设计了一套安全可靠的二进制接口，即系统调用接口 (System Call Interface)。系统调用接口通常面向应用程序提供了 API 的描述，但在具体实现上，还需要提供 ABI 的接口描述规范。
 
 在现代处理器的安全支持（特权级隔离，内存空间隔离等）下，应用程序就不能直接以函数调用的方式访问操作系统的函数，和直接读写操作系统的数据变量。不同类型的应用程序可以通过符合操作系统规定的系统调用接口，发出系统调用请求，来获得操作系统的服务。操作系统提供完服务后，返回应用程序继续执行。
+
+API与ABI在设计层面上有非常多的相似之处，但是，为了明确系统编程的需求，还是将两者的区别提一下。
 
 \subsubsection*{API 与 ABI 的区别}
 
@@ -188,6 +191,8 @@ async fn eat () {
 }
 
 \end{lstlisting}
+
+根据异步的设计规范，上述的代码，编译器将依赖状态转换，如\autoref{figure:c2breakfirststate}，实现相应的状态保存和状态转换。
 
 \subsubsection{状态转换}
 
