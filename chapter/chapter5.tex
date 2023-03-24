@@ -1,7 +1,9 @@
 \chapter{总结}
 \label{chap:Summary}
+\section{总结}
 
-\section{异步锁的思路}
+\section{展望}
+\subsection{异步锁的思路}
 
 \begin{lstlisting}[caption=异步锁结构]
 pub struct AsyncMutex<T: ?Sized> {
@@ -46,9 +48,9 @@ pub async fn lock(&self) -> AsyncMutexGuard<'_, T> {
 异步的lock函数返回一个异步的锁结构，依赖于Rust的生命周期，其会在生命周期结束的时候被释放。
 
 
-\section{文件系统的异步改造}
+\subsection{文件系统的异步改造}
 
-\subsection{如何泛化异步接口}
+\subsubsection*{如何泛化异步接口}
 
 Rust 的编译器默认并不支持 async trait function。 编译器会推荐使用 async-trait，但是经过其改装的 async trait并不是零开销的。其会将
 
@@ -110,10 +112,10 @@ pub trait AsyncBlockDevice {
     \item 既然 read 和 write 返回的是一个Future，而Rust函数是无法在其编译器中被识别为一个具体的类型的，因此，此处的NextFuture需要让编译器自动推导Feature的具体类型，通过 impl 告知编译器NextFuture相关函数的返回需要产生一个	Future。
 \end{itemize}
 
-\section{高阶进程通信}
+\subsection{高阶进程通信}
 
 
-\subsection{Mach IPC}
+\subsubsection*{Mach IPC}
 
 
 在Mach\pagescite{mach0}的微内核设计上， IPC是核心，而且是内核中最重要的组件。不同于支持IPC机制的操作系统，Mach提供了一个支持大多数操作系统的IPC机制。
