@@ -89,40 +89,30 @@
 % 2022-11-1 Andre 加载设置中文字体所需要的宏包 -- xeCJK
 \RequirePackage{xeCJK}
 
-\IfFileExists{STZhongsong.ttf}{% 2022-11-1 Andre 如果目录下有 STZhongsong.ttf
-    \newCJKfontfamily\Zhongsong{STZhongsong.ttf}[AutoFakeBold=4] % 2022-11-1 Andre 使用华文中宋 ttf 文件
-    \newCJKfontfamily\ZhongsongNormal{STZhongsong.ttf}[AutoFakeBold=false] % 2022-11-1 Andre 普通粗细的华文中宋
-}{% 2022-11-1 Andre 目录下没有，尝试使用系统字体
-    \newCJKfontfamily\Zhongsong{STZhongsong}[AutoFakeBold=4] % 2022-11-1 Andre 使用系统中宋
-    \newCJKfontfamily\ZhongsongNormal{STZhongsong}[AutoFakeBold=false] % 2022-11-1 Andre 普通粗细的中宋
-}
 % 2022-11-1 Andre 黑体
-% 2022-11-1 Andre  FIXME: 这里并没有找到比较合适的华文黑体，加粗操作之后相应
-%                         的字体会出现比较糟糕的乱码，于是就采用 Overleaf
-%                         默认提供的字体 FandolHei
-\IfFileExists{_STHeiti.ttf}{% 2022-11-1 Andre 如果目录下有 _STHeiti.ttf
-    \newCJKfontfamily\HeitiBlod{STHeiti.ttf}[AutoFakeBold=2.6]
-    \newCJKfontfamily\Heiti{STHeiti.ttf}[AutoFakeBold=0]
+\IfFileExists{simhei.ttf}{% 2022-11-1 Andre 如果目录下有 simhei.ttf
+    \newCJKfontfamily\HeitiBlod{simhei.ttf}[AutoFakeBold=2.6]
+    \newCJKfontfamily\Heiti{simhei.ttf}[AutoFakeBold=0]
 }{% 2022-11-1 Andre 目录下没有，尝试使用系统字体
-    \newCJKfontfamily\HeitiBlod{FandolHei}[AutoFakeBold=4]
-    \newCJKfontfamily\Heiti{FandolHei}[AutoFakeBold=0]
+    \newCJKfontfamily\HeitiBlod{SimHei}[AutoFakeBold=4]
+    \newCJKfontfamily\Heiti{SimHei}[AutoFakeBold=0]
 }
 % 2022-11-1 Andre 宋体
-\IfFileExists{STSong.ttf}{% 如果目录下有 STSong.ttf
-    \newCJKfontfamily\SongtiBlod{STSong.ttf}[AutoFakeBold=4]
-    \newCJKfontfamily\Songti{STSong.ttf}
+\IfFileExists{simsun.ttc}{% 如果目录下有 simsun.ttc
+    \newCJKfontfamily\SongtiBlod{simsun.ttc}[AutoFakeBold=4]
+    \newCJKfontfamily\Songti{simsun.ttc}
 }{% 2022-11-1 Andre 目录下没有，尝试使用系统字体
-    \newCJKfontfamily\SongtiBlod{FandolSong}[AutoFakeBold=4]
-    \newCJKfontfamily\Songti{FandolSong}
+    \newCJKfontfamily\SongtiBlod{SimSun}[AutoFakeBold=4]
+    \newCJKfontfamily\Songti{SimSun}
 }
 % 2022-11-1 Andre 楷体
-\IfFileExists{STKaiti.ttf}{% 2022-11-1 Andre 如果目录下有 STKaiti.ttf
-    \newCJKfontfamily\Kaiti{STKaiti.ttf}[AutoFakeBold=0]     % 2022-11-1 Andre  使用华文楷体 ttf 文件
-    \newCJKfontfamily\KaitiBold{FandolKai}[autoFakeBold=4]
+\IfFileExists{simkai.ttf}{% 2022-11-1 Andre 如果目录下有 simkai.ttf
+    \newCJKfontfamily\Kaiti{simkai.ttf}[AutoFakeBold=0]     % 2022-11-1 Andre  使用华文楷体 ttf 文件
+    \newCJKfontfamily\KaitiBold{simkai.ttf}[autoFakeBold=4]
     \newfontfamily\bKaiA{STKaiti.ttf}[AutoFakeBold=2]        % 2022-11-1 Andre 英文楷体
 }{% 2022-11-1 Andre 目录下没有，尝试使用系统字体
-    \newCJKfontfamily\KaitiBold{FandolKai}[autoFakeBold=4]
-    \newCJKfontfamily\Kaiti{FandolKai}[AutoFakeBold=0]
+    \newCJKfontfamily\KaitiBold{SimKai}[autoFakeBold=4]
+    \newCJKfontfamily\Kaiti{SimKai}[AutoFakeBold=0]
 }
 
 
@@ -296,7 +286,7 @@
   basicstyle=
       % 2022-11-3 Andre \normalsize
     % \zihao{-4}
-    \ttfamily
+    \zihao{-4}\fontspec{Times New Roman}
     \lst@ifdisplaystyle\scriptsize\fi
 }
 \lstset{
