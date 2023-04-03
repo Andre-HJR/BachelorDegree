@@ -4,7 +4,6 @@
 \abstractcn
 
 
-% 操作系统内核经历了几个主要的发展阶段，从裸机应用、批处理系统到多道任务系统，演变为至今主流的线程操作系统。这种系统基于线程的切换来调度任务；为了提升它的性能，有一些语言和编程架构，在应用层复用线程资源，提出了“协程”的概念，节省任务调度的开销。毕设工作尝试使得操作系统中不同资源被调度器所共享，调度器将所使用的资源同时共享给内核和用户，由此两者将拥有近乎相同的调度处理机制。同时，为了降低系统的耦合程度，尝试模块化系统内核，尝试将系统组件剥离。所以，工作如下：
 操作系统内核有几个发展节点， 一开始以裸机应用、批处理系统为主，后来逐渐出现多任务的操作系统，为了应对系统发展的需求，基于线程的系统应运而生；为了提升它的性能，有一些语言和编程架构，在应用层复用线程资源，提出了“协程”的概念，节省任务调度的开销。毕设工作尝试使得操作系统中不同资源被调度器所共享，调度器将所使用的资源同时共享给内核和用户，由此两者将拥有近乎相同的调度处理机制。同时，为了降低系统的耦合程度，尝试模块化系统内核，尝试将系统组件剥离。所以，工作如下：
 
 \begin{itemize}
@@ -21,9 +20,7 @@
 % 英文摘要
 \abstracten
 
-
 The operating system kernel has several development nodes, at the beginning bare-metal applications and batch systems were the main focus, and then gradually emerged multitasking operating systems, and in response to the needs of system development, thread-based systems came into being In order to improve its performance, there are languages and programming architectures that reuse thread resources at the application level and propose In order to improve its performance, some languages and programming architectures reuse thread resources at the application level and propose the concept of "concurrent threads" to save the overhead of task scheduling. Bishop's work tries to make the different resources in the operating system shared by the scheduler, and the scheduler can save the overhead of scheduling. resources in the operating system are shared by the scheduler, and the scheduler shares the used resources with both the kernel and the user, so that both will The scheduler shares the used resources with both the kernel and the user, so that both will have nearly identical scheduling processing mechanisms. At the same time, in order to reduce the coupling of the system, an attempt was made to modularize the system kernel. to reduce the system coupling and try to modularize the system kernel and try to strip the system components. So, it works as follows:
-
 
 \begin{itemize}
 \item Ring\_scheduler: Its own work is to continue the work of tronado-os and implement a ring\_scheduler similar to shared\_
@@ -34,8 +31,6 @@ and try to orthogonalize it out of the kernel module to form a separate module (
 \end{itemize}
 
 
-The goal of Bishop is to try to use the Rust language and open source toolchain to implement fine-grained concurrency-safe, modularization in the OS kernel.
-The goal of the project is to use the Rust language and open source toolchain to implement fine-grained concurrency safety and modularity in the OS kernel. We will use Rust's asynchronous mechanism to optimize the concurrency performance of the OS kernel, and use the compiler tool Cargo, combined with Rust's language features, to try to modularize the system kernel and achieve flexible organization of kernel components.
-
+The goal of Bishop is to try to implement concurrency in kernel space in a safe and modular way using the concurrency model and module management provided by the Rust language. The asynchronous mechanism of Rust, on the other hand, provides an optimization reference for operating system concurrency. Modularized system kernel for flexible kernel development.
 % 英文关键词
 \keywordsen\quad OS；Rust；Asynchronous；Modularity；IO
