@@ -76,8 +76,14 @@ SBI（Supervisor Binary Interface）是Supervisor Execution Environment (SEE)和
 页表分为一级页表（多级页表的根节点），二级页表，三级页表（多级页表的叶节点）。每个页表都用 9 位索引，因此有 $2^9=512$ 个页表项，而每个页表项都是 8 字节，因此每个页表大小都为 $512\times 8=4 \mathrm{KiB}$，正好是一个物理页的大小。\pagescite{riscv0}从而可以把一个页表放到一个物理页中，并用一个物理页号来描述它。事实上，一级页表的每个页表项中的物理页号可描述一个二级页表；二级页表的每个页表项中的物理页号可描述一个三级页表；三级页表中的页表项内容则和先前提到的页表项一样，包含物理页号，即描述一个要映射到的物理页。\pagescite{riscv0}
 
 % TODO: could not fix.
-具体来说，假设虚拟地址的格式为$(virtualPageNumber_{0} ,virtualPageNumber_{1},virtualPageNumber_{2},offset)$：
-	首先会装载，当前所用的一级页表的物理页的页号到 satp 寄存器中；
+具体来说，假设虚拟地址的格式为：
+\begin{equation}
+    \label{equation:c2vpn}
+    \begin{aligned}
+        (virtualPageNumber_{0} ,virtualPageNumber_{1},virtualPageNumber_{2},offset)
+    \end{aligned}
+\end{equation}
+	系统的内存，首先会装载，当前所用的一级页表的物理页的页号到 satp 寄存器中；
     \begin{itemize}
 	\item 把 $virtualPageNumber_{0}$ 作为偏移量在一级页表的物理页中找到二级页表的物理页号；
 	\item 把 $virtualPageNumber_{1}$ 作为偏移量在二级页表的物理页中找到三级页表的物理页号；
