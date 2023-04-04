@@ -505,9 +505,9 @@
 \begin{flushright}
     \renewcommand\arraystretch{1.0}
     \begin{tabularx}{9.5cm}{*{2}{>{\raggedleft\arraybackslash}X}}
-        承诺人(签名)： &    \\  \cline{2-2}
+        承诺人(签名)： & \includegraphics[scale=0.3]{element/sign.png}\\  \cline{2-2}
         & \\
-        日期： & 年 \hspace{1\ccwd} 月 \hspace{1\ccwd} 日 \\
+        日期： & 2023年 \hspace{1\ccwd} 4月 \hspace{1\ccwd} 17日 \\
     \end{tabularx}
 \end{flushright}
 \afterpage{\thispagestyle{empty}}
