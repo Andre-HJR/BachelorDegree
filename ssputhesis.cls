@@ -207,14 +207,14 @@
     % 2022-11-3 Andre plain 需要头部的 Logo 和 底部的页码
     \fancyhead{\centering\includegraphics[scale=1]{element/header.png}}
     \fancyfoot[CO,CE]{\thepage}
-    \renewcommand{\headrulewidth}{0pt}
+    \renewcommand{\headrulewidth}{0.4pt}
     \renewcommand{\footrulewidth}{0pt}
 }
 \fancypagestyle{plains}{%
     % 2022-11-3 Andre plain 需要头部的 Logo
     \fancyhead{\centering\includegraphics[scale=1]{element/header.png}}
     \fancyfoot[CO,CE]{}
-    \renewcommand{\headrulewidth}{0pt}
+    \renewcommand{\headrulewidth}{0.4pt}
     \renewcommand{\footrulewidth}{0pt}
 }
 \pagestyle{plain}
