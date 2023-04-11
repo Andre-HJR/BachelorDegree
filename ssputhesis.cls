@@ -125,8 +125,9 @@
     % 2022-11-1 Andre 将目录居中
     contentsname = {\centering{目录}},
     chapter = {
-        number = \arabic{chapter},
-        format = {\Heiti\bfseries\centering\zihao{4}},
+        name = {,、},
+        number = {\chinese{chapter}},
+        format = {\Heiti\bfseries\centering\zihao{3}},
         numberformat += \bfseries,
         pagestyle = plain,
         fixskip = true,
@@ -134,15 +135,18 @@
         afterskip = 35pt
     },
     section = {
-        format = {\Heiti\bfseries\zihao{-4}},
+        number = {（\chinese{section}）},
+        format = {\Heiti\bfseries\zihao{4}},
         numberformat += \bfseries,
         aftername = \hspace{0.5em} ,
         beforeskip = 9pt,
         afterskip = 6pt,
     },
     subsection = {
-        format = {\Kaiti\bfseries\zihao{-4}},
-        numberformat += \bfseries,
+        name={,.},
+        number = {\arabic{subsection}},
+        format = {\Heiti\bfseries\zihao{-4}},
+        numberformat = \bfseries,
         aftername = \hspace{0.5em} ,
         indent=2em,
         fixskip = true,
@@ -154,8 +158,8 @@
     %                      \ 相应的添加。
     subsubsection = {   
         format = {\bfseries\zihao{-4}},
-        name = {(,)},
-        number = {\arabic{subsubsection}},
+        name = {,.},
+        number = {\arabic{subsection}.\arabic{subsubsection}},
         numberformat += \bfseries,
         aftername = \hspace{0.5em},
         indent = 4em,
@@ -176,17 +180,17 @@
 % 2022-11-1 Andre 点间距
 \renewcommand{\cftdotsep}{1}
 % 2022-11-1 Andre 设置相关的目录文字格式
-\ctexset { chapter = { name={}, number = {\arabic{chapter} } } }
-% \ctexset { section = { name={}, number= {（\chinese {section}）} } } 
-% \ctexset { subsection = { name={}, number= {\arabic{subsection}} } } 
-\renewcommand{\cftsubsecfont}{\Kaiti}
-\renewcommand{\cftsecfont}{\Songti}
-\renewcommand{\cftchapfont}{\Songti}
+%\ctexset { chapter = { name={,、}, number = {\chinese{chapter}} } }
+%\ctexset { section = { name={}, number= {（\chinese {section}）} } } 
+%\ctexset { subsection = { name={,。}, number= {\arabic{subsection}} } } 
+%\renewcommand{\cftsubsecfont}{\Kaiti}
+%\renewcommand{\cftsecfont}{\Songti}
+%\renewcommand{\cftchapfont}{\Songti}
 \setlength{\cftbeforechapskip}{6pt}
 \setlength{\cftbeforesecskip}{0pt}
 \setlength{\cftbeforesubsecskip}{0pt}
-\setlength{\cftsecindent}{1em}
-\setlength{\cftsubsecindent}{2em}
+\setlength{\cftsecindent}{2em}
+\setlength{\cftsubsecindent}{4em}
 \setlength{\cftsecnumwidth}{1em}
 \setlength{\cftsubsecnumwidth}{2em}
 \renewcommand{\cftchapfont}{\Songti\bfseries\zihao{4}}
@@ -255,10 +259,11 @@
 
 % 2022-11-3 Andre 其他环境中的 caption
 \RequirePackage{caption}
+\DeclareCaptionFont{heiti}{\Heiti}
 \DeclareCaptionFont{wuhao}{\zihao{5}}
 \captionsetup {
     labelsep=quad,
-    font = {wuhao}
+    font = {wuhao, heiti, stretch=1.625}
 }
 
 \providecommand{\tableCapSet}{  % 调节表格标题和上下文的间距
@@ -456,7 +461,6 @@
 \listeqpatch{gather}
 \listeqpatch{multline}
 \listeqpatch{flalign}
-
 
 %% @title: \includefrontmatter
 %% @author: Andre
