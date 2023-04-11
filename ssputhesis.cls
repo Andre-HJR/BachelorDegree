@@ -211,7 +211,7 @@
 \fancypagestyle{plain}{
     % 2022-11-3 Andre plain 需要头部的 Logo 和 底部的页码
     \fancyhead{\centering\includegraphics[scale=1]{element/header.png}}
-    \fancyfoot[CO,CE]{\thepage}
+    \fancyfoot[CO,CE]{{\zihao{-5}\Heiti\thepage}}
     \renewcommand{\headrulewidth}{0.4pt}
     \renewcommand{\footrulewidth}{0pt}
 }
