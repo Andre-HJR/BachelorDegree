@@ -13,25 +13,22 @@
 \end{itemize}
 
 
-本文的目标是尝试利用Rust语言，在内核空间中实现并发安全、模块化。（不足）
+本文的目标是尝试利用 Rust 语言，在内核空间中实现并发安全、模块化。由于时间和自己能力有限，本文的仅实现了内核及用户各自独立的异步调度和系统的模块化工作。
 
 % 中文关键词
 \keywordscn\quad 操作系统；Rust；异步；模块化；IO
 % 英文摘要
 \abstracten
 
-The operating system kernel has several development nodes, at the beginning bare-metal applications and batch systems were the main focus, and then gradually emerged multitasking operating systems, and in response to the needs of system development, thread-based systems came into being In order to improve its performance, there are languages and programming architectures that reuse thread resources at the application level and propose In order to improve its performance, some languages and programming architectures reuse thread resources at the application level and propose the concept of "concurrent threads" to save the overhead of task scheduling. Bishop's work tries to make the different resources in the operating system shared by the scheduler, and the scheduler can save the overhead of scheduling. resources in the operating system are shared by the scheduler, and the scheduler shares the used resources with both the kernel and the user, so that both will The scheduler shares the used resources with both the kernel and the user, so that both will have nearly identical scheduling processing mechanisms. At the same time, in order to reduce the coupling of the system, an attempt was made to modularize the system kernel. to reduce the system coupling and try to modularize the system kernel and try to strip the system components. So, it works as follows:
+Operating system kernel has several development nodes, at the beginning to bare computer application, batch processing system, and then gradually appeared multi-task operating system, in order to meet the needs of system development, based on thread system came into being; In order to improve the performance of the operating system, some languages and programming architectures reuse thread resources in the application layer and put forward the concept of "coroutine" to save the overhead of task scheduling. In order to share different resources in the operating system by the scheduler, the scheduler shares the used resources to both the kernel and the user. At the same time, in order to reduce the coupling degree of the system, this paper tries to modularize the system kernel, so that the system components are stripped away. The main work of this paper is as follows:
 
 \begin{itemize}
-\item Ring\_scheduler: Its own work is to continue the work of tronado-os and implement a ring\_scheduler similar to shared\_
-scheduler, plug it into rCore and make it work in rCore, and try to remove it from the kernel module.
-and try to orthogonalize it out of the kernel module to form a separate module (Crate).
+\item Ring\_scheduler, Based on the work of tonado-os\pagescite{tornado0}, this paper implements a ring\_ scheduler similar to shared\_ scheduler\pagescite{tornado0}. Plug it into rCore and make it work in rCore, and try to orthogonal it out of the kernel module to form a standalone module (Crate).
 
-\item Modular design: The modular idea, which relies heavily on the compile time of the language, is essentially to form independent and hierarchical dependency trees by orthogonalizing modules together, with the design dependencies between modules bounded by API calls between them.
+\item is based on the idea of modularity and depends on the compilation of language. When the mixed modules are orthogonal, an independent and hierarchical dependency tree is formed. The design between modules depends on the constraints of API between modules.
 \end{itemize}
 
-
-The goal of Bishop is to try to implement concurrency in kernel space in a safe and modular way using the concurrency model and module management provided by the Rust language. The asynchronous mechanism of Rust, on the other hand, provides an optimization reference for operating system concurrency. Modularized system kernel for flexible kernel development.
+The goal of this article is to try to implement concurrency security and modularity in kernel space using the Rust language. Due to the limited time and their own ability, this paper only realizes the kernel and users of their own independent asynchronous scheduling and modular work of the system.
 
 % 英文关键词
 \keywordsen\quad OS；Rust；Asynchronous；Modularity；IO
