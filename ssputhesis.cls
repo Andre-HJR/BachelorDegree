@@ -49,6 +49,7 @@
 %% 定义了 ssputhesis 的默认结构为 双面右开， 字jjj号默认为小四
 \LoadClass[twoside, zihao=-4, openright]{ctexbook} % 基于 ctexbook，双面右开
 
+
 % 2022-11-1 Andre 加载颜色定义所需要的宏包 -- xcolor
 \RequirePackage[dvipsnames]{xcolor} % 用于定义颜色
 \colorlet{darkred}{red!15!black}  % 深红色
@@ -390,7 +391,8 @@
 \RequirePackage{etoolbox}   % \patchcmd{}{}{}
 \RequirePackage{afterpage}  % \afterpage
 \providecommand{\abstractcn}{ % 中文摘要
-    \cleardoublepage %
+    %\let\cleardoublepage\clearpage %
+    \cleardoublepage
     % \addtocontents{toc}{\cftpagenumbersoff{chapter}} %
     % \chapter*{\zihao{-2}{\ssputhesis@title}\\\vspace{2em}\zihao{3}{摘\texorpdfstring{\quad}{}要}} % 使用 \texorpdfstring 消除警告信息
     \begin{center}
@@ -455,7 +457,6 @@
 \listeqpatch{multline}
 \listeqpatch{flalign}
 
-\let\cleardoublepage\clearpage
 
 %% @title: \includefrontmatter
 %% @author: Andre
@@ -501,7 +502,7 @@
 \end{titlepage}
 \thispagestyle{empty}
 %\afterpage{thispagestyle{empty}}
-\cleardoublepage
+\let\cleardoublepage\clearpage
 \setcounter{page}{1}
 \begin{center}\zihao{-2}{毕业设计（论文）独创性声明}\end{center}
 \thispagestyle{plains}

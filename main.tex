@@ -34,10 +34,12 @@
 \begin{document}
 % 盲审时将下面一行注释掉
 
+% \linespread{1.625}
 \includefrontmatter  % 输出封面、承诺书、摘要和目录
     
 \mainmatter % 中间内容
 
+\begin{spacing}{1.625}
 \input{chapter/chapter1} % 绪论
 \let\cleardoublepage\clearpage
 \input{chapter/chapter2} % 前置知识
@@ -48,15 +50,18 @@
 \let\cleardoublepage\clearpage
 \input{chapter/chapter5} % 总结
 \let\cleardoublepage\clearpage
+\end{spacing}
 
 \ifduplicatecheck
 \else
+\begin{spacing}{1.625}
 % 盲审时将下面三行注释掉
 % \backmatter % 结尾内容
 \input{element/thanking} % 致谢
 \let\cleardoublepage\clearpage
 \input{element/citation} % 参考文献
 \let\cleardoublepage\clearpage
+\end{spacing}
 %% \input{element/appendix} % 附录
 %% \let\cleardoublepage\clearpage
 \fi
