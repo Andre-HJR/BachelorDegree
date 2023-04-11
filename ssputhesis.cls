@@ -352,6 +352,12 @@
 \providecommand*{\chapref}[1]{\hyperref[{#1}]{第 \ref*{#1} 章}}
 \providecommand*{\secref}[1]{\hyperref[{#1}]{第 \ref*{#1} 节}}
 \providecommand*{\subsecref}[1]{\hyperref[{#1}]{第 \ref*{#1} 小节}}
+\renewcommand {\thetable} {\thechapter{}-\arabic{table}}
+\renewcommand {\thefigure} {\thechapter{}-\arabic{figure}}
+\renewcommand{\theequation}{\thechapter{}-\arabic{equation}} 
+\AtBeginDocument{
+  \renewcommand\thelstlisting{\thechapter{}-\arabic{lstlisting}}
+}
 
 \RequirePackage{enumitem}
 \setlist[enumerate,itemize,description]{noitemsep}
