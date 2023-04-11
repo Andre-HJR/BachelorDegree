@@ -449,6 +449,7 @@
 \listeqpatch{multline}
 \listeqpatch{flalign}
 
+\let\cleardoublepage\clearpage
 
 %% @title: \includefrontmatter
 %% @author: Andre
