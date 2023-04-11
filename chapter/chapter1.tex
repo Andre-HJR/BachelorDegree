@@ -52,10 +52,10 @@ io\_uring的工作流如\autoref{figure:c1iouring}所示，io\_uring的基本逻
 \begin{enumerate}
 \item 中断驱动的默认模式。提交相应的I/O请求，查询完成队列的状态判断是否完成。
 \item 轮询模式，通过文件系统和块设备支持轮询作为基础，相比前一种模式，虽然延迟比较低，但会消耗更多计算资源。当一个读或写请求提交给轮询上下文之后，应用必须轮询CQ队列，判断请求是否已经完成。
-\item 内核轮询模式，会创建一个内核线程来执行请求队列的轮询工作。\pagescite{IoUring1}
+\item 内核轮询模式，会创建一个内核线程来执行请求队列的轮询工作\pagescite{IoUring1}。
 \end{enumerate}
 
-io\_uring的内核轮询模式， 使得用户空间的应用无需切到到内核态就可以触发I/O的操作。\pagescite{IoUring0}通过请求队列来提交请求事件，以及监控完成队列的状态，无需系统调用，就能提交和捕获I/O操作。\pagescite{IoUring0}
+io\_uring的内核轮询模式， 使得用户空间的应用无需切到到内核态就可以触发I/O的操作\pagescite{IoUring0}。通过请求队列来提交请求事件，以及监控完成队列的状态，无需系统调用，就能提交和捕获I/O操作\pagescite{IoUring0}。
 
 
 \subsection{国内现状}

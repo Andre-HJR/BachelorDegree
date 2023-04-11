@@ -5,7 +5,7 @@
 
 \subsection{内存管理}
 
-除了设计中提到的关于Sv39的内存设计规范之外，由于内核和用户之间会通过ring\_scheduler共享相关的内存信息，因此需要通过KernelHartInfo记录空间跨越时，相应的地址映射，上下文等重要信息。
+除了需要实现Sv39的内存设计规范之外，由于内核和用户之间会通过ring\_scheduler共享相关的内存信息，因此需要通过KernelHartInfo记录空间跨越时，相应的地址映射，上下文等重要信息。
 
 \subsubsection{地址空间的映射}
 
@@ -288,18 +288,18 @@ pub fn sys_thread_create(entry: usize, arg: usize) -> isize {
 }
 \end{lstlisting}
 
-内核会为每个线程分配一组专属于该线程的资源：用户栈、Trap 上下文还有内核栈，前面两个在进程地址空间中，内核栈在内核地址空间中。这样这些线程才能相对独立地被调度和执行。由此可以知道线程的创建并不需要建立新的地址空间，而进程的创建则需要fork系统调用，会拷贝父进程的地址空间。\pagescite{rcore0}
+内核会为每个线程分配一组专属于该线程的资源：用户栈、Trap 上下文还有内核栈，前面两个在进程地址空间中，内核栈在内核地址空间中。这样这些线程才能相对独立地被调度和执行。由此可以知道线程的创建并不需要建立新的地址空间，而进程的创建则需要fork系统调用，会拷贝父进程的地址空间\pagescite{rcore0}。
 
-线程可以通过两种方式创建：第一种是在创建进程的时候默认为这个进程创建一个主线程（创建进程又分为若干种方式）；\pagescite{rcore0}第二种是通过 thread\_create 系统调用在当前进程内创建一个新的线程。参考第二中方式，则在线程创建的时候需要注意保存如下信息： 
+线程可以通过两种方式创建：第一种是在创建进程的时候默认为这个进程创建一个主线程（创建进程又分为若干种方式）\pagescite{rcore0}；第二种是通过 thread\_create 系统调用在当前进程内创建一个新的线程。参考第二中方式，则在线程创建的时候需要注意保存如下信息： 
 
 \begin{itemize}
-\item 用户栈：用户态的线程执行函数空间；\pagescite{rcore0}
-\item 内核栈：线程陷入内核后函数执行空间；\pagescite{rcore0}
+\item 用户栈：用户态的线程执行函数空间\pagescite{rcore0}；
+\item 内核栈：线程陷入内核后函数执行空间\pagescite{rcore0}；
 \item 跳板页和独占的空间上下文\pagescite{rcore0}：对不同空间的线程进行维护，确保切换的正确执行；
 \item 任务上下文：内核态的寄存器信息，服务于线程切换。
 \end{itemize}
 
-其中new\_task\_trap\_cx，初始化线程在用户态地址空间中空间切换的上下文：对线程的函数入口向量和对应的栈空间，从而确保初次进入用户态时，内核能从指定位置正确执行；\pagescite{rcore0}设置好内核栈和trap的函数指针 ，保证在空间切换的时候用户态的线程能正确进入内核态。
+其中new\_task\_trap\_cx，初始化线程在用户态地址空间中空间切换的上下文：对线程的函数入口向量和对应的栈空间，从而确保初次进入用户态时，内核能从指定位置正确执行\pagescite{rcore0}；设置好内核栈和trap的函数指针 ，保证在空间切换的时候用户态的线程能正确进入内核态。
 
 
 \subsubsection{互斥锁}
@@ -368,7 +368,7 @@ impl Condvar {
 \end{lstlisting}
 
 
-signal 从阻塞队列中移除一个线程并调用唤醒原语 wakeup\_task 将其唤醒。wait\_ with\_ mutex 以当前线程所持有的锁作为输入。\pagescite{rcore0}首先释放锁，然后当线程压入条件变量所在的阻塞队列中，之后通过阻塞原语 block\_current\_and\_run\_next 阻塞当前线程。在被唤醒之后还需要重新获取锁，这样 wait 才能返回。
+signal 从阻塞队列中移除一个线程并调用唤醒原语 wakeup\_task 将其唤醒。wait\_ with\_ mutex 以当前线程所持有的锁作为输入\pagescite{rcore0}。首先释放锁，然后当线程压入条件变量所在的阻塞队列中，之后通过阻塞原语 block\_current\_and\_run\_next 阻塞当前线程。在被唤醒之后还需要重新获取锁，这样 wait 才能返回。
 
 \subsubsection{信号量}
 
@@ -431,130 +431,3 @@ pub fn execute_async() {
 得益于共享调度的设计，ring\_scheduler的物理地址无论在内核空间还是用户空间都是可见的，因此内核和用户可以通过run\_until\_ready来执行相应的异步任务， 即从ring\_scheduler中获取任务， 将任务(指针)存入调度器，改变调度器中原有任务的任务状态。
 
 
-\subsection{异步事件的底层依赖: Event}
-
-需要设计一个事件监听的工具，使得可以将同步的数据结构转化为异步的数据结果，为异步提供基础的依赖。
-
-异步事件的内部同步的数据结构为:
-
-\begin{lstlisting}[caption=异步事件底层的同步结构]
-struct Inner {
-    notified: AtomicUsize,
-    list: Mutex<List>,
-    cache: UnsafeCell<Entry>,
-}
-\end{lstlisting}
-
-Inner中的notified用于通知已被通知的Entry的数目，如果所有条目都被通知了，或者没有条目被通知，该值都会被设置为usize::MAX。而list则是用于指向已被注册的监听的链表， 而Mutex提供在多线程中list资源的锁机制，以解决资源竞争带来的数据冲突。
-
-基于设计的底层同步结构，事件库将提供事件原语和状态机制，以此为系统上层异步改造提供基础组件。
-
-\subsubsection{异步事件的一些原语}
-\label{sssec:event}
-
-\begin{lstlisting}[caption = 监听者的注册]
-pub fn listen(&self) -> EventListener {
-    let inner = self.inner();
-    let listener = EventListener {
-        inner: unsafe { Arc::clone(&ManuallyDrop::new(Arc::from_raw(inner))) },
-        entry: Some(inner.lock().insert(inner.cache_ptr())),
-    };
-
-    // Make sure the listener is registered before whatever happens next.
-    full_fence();
-    listener
-}
-\end{lstlisting}
-
-\begin{lstlisting}[caption = 通知一定数量的监听者]
-pub fn notify(&self, n: usize) {
-    full_fence();
-    if let Some(inner) = self.try_inner() {
-        if inner.notified.load(Ordering::Acquire) < n {
-            inner.lock().notify(n);
-        }
-    }
-}
-\end{lstlisting}
-
-\begin{lstlisting}[caption = 通知一定数量没有被通知的监听者]
-pub fn notify_additional(&self, n: usize) {
-    full_fence();
-
-    if let Some(inner) = self.try_inner() {
-        if inner.notified.load(Ordering::Acquire) < usize::MAX {
-            inner.lock().notify_additional(n);
-        }
-    }
-}
-\end{lstlisting}
-
-\begin{lstlisting}[caption=full\_fence]
-fn full_fence() {
-    core::sync::atomic::fence(Ordering::SeqCst);
-}
-\end{lstlisting}
-
-full\_fence 该函数会阻止编译器和CPU围绕对某些类型的内春操作重新排序。使其可以在一些原子操作中创建同步关系。
-
-\subsubsection{Event异步事件的状态}
-\begin{lstlisting}[caption=Event的状态]
-enum State {
-    /// 刚刚被创建
-    Created,
-    /// 已经接收到一个通知
-    ///
-    /// 如果这是个 `additional` 通知，`bool` 将为 `true`
-    Notified(bool),
-    /// 正在被一个异步任务 `poll`，保存了任务的 `waker`
-    Polling(Waker),
-}
-\end{lstlisting}
-
-只用当状态为`State::Notified(bool)`的时候，事件才是被通知， 因此有如下的事件监听机制：
-
-\begin{lstlisting}[caption=Event的事件获取并判断事件是否完成]
-impl Future for EventListener {
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut list = self.inner.lock();
-
-        let entry = match self.entry {
-            None => unreachable!("cannot poll a completed `EventListener` future"),
-            Some(entry) => entry,
-        };
-        // ...
-    }
-}
-\end{lstlisting}
-
-
-\begin{lstlisting}[caption=Event的事件Poll机制]
-impl Future for EventListener {
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        // ...
-        let state = unsafe { &entry.as_ref().state };
-        match state.replace(State::Notified(false)) {
-            State::Notified(_) => {
-                list.remove(entry, self.inner.cache_ptr());
-                drop(list);
-                self.entry = None;
-                return Poll::Ready(());
-            }
-            State::Created => {
-                state.set(State::Polling(cx.waker().clone()));
-            }
-            State::Polling(w) => {
-                if w.will_wake(cx.waker()) {
-                    state.set(State::Polling(w));
-                } else {
-                    state.set(State::Polling(cx.waker().clone()));
-                }
-            }
-        }
-        Poll::Pending
-    }
-}
-\end{lstlisting}
-
-
-当获取事件的状态的可变引用时， 当章台为Polling和Created的时候，事件将会被加入到注册的waker序列中，当为Notified时，事件将会从序列中移除，然后释放相应的资源，并返回Ready告知任务已经完成，其余状态统一返回Pending

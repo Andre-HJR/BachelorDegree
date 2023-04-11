@@ -1,0 +1,106 @@
+
+\subsection{异步事件的底层依赖: Event}
+
+需要设计一个事件监听的工具，使得可以将同步的数据结构转化为异步的数据结果，为异步提供基础的依赖。
+
+异步事件的内部同步的数据结构为:
+
+\begin{lstlisting}[caption=异步事件底层的同步结构]
+struct Inner {
+    notified: AtomicUsize,
+    list: Mutex<List>,
+    cache: UnsafeCell<Entry>,
+}
+\end{lstlisting}
+
+Inner中的notified用于通知已被通知的Entry的数目，如果所有条目都被通知了，或者没有条目被通知，该值都会被设置为usize::MAX。而list则是用于指向已被注册的监听的链表， 而Mutex提供在多线程中list资源的锁机制，以解决资源竞争带来的数据冲突。
+
+基于设计的底层同步结构，事件库将提供事件原语和状态机制，以此为系统上层异步改造提供基础组件。
+
+\subsubsection{异步事件的一些原语}
+\label{sssec:event}
+
+\begin{lstlisting}[caption = 监听者的注册]
+pub fn listen(&self) -> EventListener {
+    let inner = self.inner();
+    let listener = EventListener {
+        inner: unsafe { Arc::clone(&ManuallyDrop::new(Arc::from_raw(inner))) },
+        entry: Some(inner.lock().insert(inner.cache_ptr())),
+    };
+
+    // Make sure the listener is registered before whatever happens next.
+    full_fence();
+    listener
+}
+\end{lstlisting}
+
+监听者的创建， full\_fence 该函数会阻止编译器和CPU围绕对某些类型的内春操作重新排序。使其可以在一些原子操作中创建同步关系。
+
+
+\subsubsection{Event异步事件的状态}
+\begin{lstlisting}[caption=Event的状态]
+enum State {
+    /// 刚刚被创建
+    Created,
+    /// 已经接收到一个通知
+    ///
+    /// 如果这是个 `additional` 通知，`bool` 将为 `true`
+    Notified(bool),
+    /// 正在被一个异步任务 `poll`，保存了任务的 `waker`
+    Polling(Waker),
+}
+\end{lstlisting}
+
+只用当状态为`State::Notified(bool)`的时候，事件才是被通知， 因此有如下的事件监听机制：
+
+\begin{lstlisting}[caption=Event的事件获取并判断事件是否完成]
+impl Future for EventListener {
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let mut list = self.inner.lock();
+
+        let entry = match self.entry {
+            None => unreachable!("cannot poll a completed `EventListener` future"),
+            Some(entry) => entry,
+        };
+        // ...
+    }
+}
+\end{lstlisting}
+
+如若事件没有完成，则抛出异常。
+
+
+\begin{lstlisting}[caption=Event的事件Poll机制]
+impl Future for EventListener {
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        // ...
+        let state = unsafe { &entry.as_ref().state };
+        match state.replace(State::Notified(false)) {
+            State::Notified(_) => {
+                list.remove(entry, self.inner.cache_ptr());
+                drop(list);
+                self.entry = None;
+                return Poll::Ready(());
+            }
+            State::Created => {
+                state.set(State::Polling(cx.waker().clone()));
+            }
+            State::Polling(w) => {
+                if w.will_wake(cx.waker()) {
+                    state.set(State::Polling(w));
+                } else {
+                    state.set(State::Polling(cx.waker().clone()));
+                }
+            }
+        }
+        Poll::Pending
+    }
+}
+\end{lstlisting}
+
+
+当获取事件的状态的可变引用时， 当章台为Polling和Created的时候，事件将会被加入到注册的waker序列中，当为Notified时，事件将会从序列中移除，然后释放相应的资源，并返回Ready告知任务已经完成，其余状态统一返回Pending。
+
+在上述的代码中，基于Future的trait接口，Output将会被返回一个异步的值。 只有当poll返回的值Ready()时，函数将完成的值进行Poll的封装，返回其状态完成的变体。否则，将返回其其他状态的变体，向其范围内全局的调用者发出该工作尚未完成的信号。
+
+poll方法接收两个参数： Pin（固定地址空间）和Context（函数上下文）。前者的行为类似普通引用，只是将值固定到内存的位置。后者存在的目的时为了Waker的实例可以被异步任务接收。这使得异步任务可以发出信号，表面其此时的状态（完成或一部分已完成）。由于主任务知道其将在准备就绪时收到通知，因此不需要一遍一遍调用。
