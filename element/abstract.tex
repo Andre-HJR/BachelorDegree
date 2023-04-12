@@ -5,12 +5,15 @@
 
 
 \begin{spacing}{1.625}
+
 操作系统内核有几个发展节点， 一开始以裸机应用、批处理系统为主，后来逐渐出现多任务的操作系统，为了应对系统发展的需求，基于线程的系统应运而生；为了提升操作系统的性能，有些语言和编程架构，在应用层复用线程资源，提出了“协程”的概念，节省任务调度的开销。为了使操作系统中不同资源被调度器所共享，调度器将所使用的资源同时共享给内核和用户；同时，为了降低系统的耦合程度，本文尝试模块化系统内核，使得系统组件剥离。本文主要工作如下：
+
 \begin{itemize}
-\item Ring\_scheduler: 本文基于tonado-os\pagescite{tornado0}的工作， 实现一个类似 shared\_ scheduler\pagescite{tornado0} 的ring\_scheduler，将其接入rCore并使得其可以工作在rCore中，并试着将其从内核模块中正交出来，形成一个独立的模块（Crate）。 
+\item Ring\_scheduler，本文基于tonado-os的工作， 实现一个类似 shared\_ scheduler 的ring\_scheduler，将其接入rCore并使得其可以工作在rCore中，并试着将其从内核模块中正交出来，形成一个独立的模块（Crate）。 
 
 \item 基于模块化的思想，同时依赖于语言的编译时，将杂糅在一起的模块通过正交，形成独立且具有层次的的依赖树，而模块之间的设计，依赖模块之间API的约束。
 \end{itemize}
+
 本文的目标是尝试利用 Rust 语言，在内核空间中实现并发安全、模块化。由于时间和自己能力有限，本文仅实现了内核及用户各自独立的异步调度和系统的模块化工作。
 
 % 中文关键词
@@ -24,7 +27,7 @@
 Operating system kernel has several development nodes, at the beginning to bare computer application, batch processing system, and then gradually appeared multi-task operating system, in order to meet the needs of system development, based on thread system came into being; In order to improve the performance of the operating system, some languages and programming architectures reuse thread resources in the application layer and put forward the concept of "coroutine" to save the overhead of task scheduling. In order to share different resources in the operating system by the scheduler, the scheduler shares the used resources to both the kernel and the user. At the same time, in order to reduce the coupling degree of the system, this paper tries to modularize the system kernel, so that the system components are stripped away. The main work of this paper is as follows:
 
 \begin{itemize}
-\item Ring\_scheduler, Based on the work of tonado-os\pagescite{tornado0}, this paper implements a ring\_ scheduler similar to shared\_ scheduler\pagescite{tornado0}. Plug it into rCore and make it work in rCore, and try to orthogonal it out of the kernel module to form a standalone module (Crate).
+\item Ring\_scheduler, Based on the work of tonado-os, this paper implements a ring\_ scheduler similar to shared\_ scheduler. Plug it into rCore and make it work in rCore, and try to orthogonal it out of the kernel module to form a standalone module (Crate).
 
 \item is based on the idea of modularity and depends on the compilation of language. When the mixed modules are orthogonal, an independent and hierarchical dependency tree is formed. The design between modules depends on the constraints of API between modules.
 \end{itemize}
