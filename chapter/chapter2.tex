@@ -10,18 +10,15 @@ Rust\pagescite{rust0} 是一门十分高效的编程语言， 其设计目的是
 RISC-V\pagescite{riscv0}指令集是基于精简指令集计算(RISC)原理建立的开放指令集架构(ISA)，RISC-V是在指令集不断发展和成熟的基础上建立的全新指令。RISC-V指令集是开源的，由于设计简单，该指令集易于移植。Riscv的模块化设计和完整的开发工具链，使其拥有大量的开源实现和流片。
 
 \section{异步的理解}
-
-如下我们可以通过下面这个图理解Future
-
 \begin{figure}[htb]
     \figureCapSet
     \centering
-    \includegraphics[width=.8\linewidth]{figure/c2/breakfirstsequence.png}
+    \includegraphics[scale=0.5]{figure/c2/breakfirstsequence.png}
     \caption{Breakfirst的同步和异步}
     \label{figure:c2breakfirstsequence}
 \end{figure}
 
-这张序列图显示了一个函数，该函数为eat函数。先执行了同步的eat\_milk和eat\_bread函数，又执行了async\_eat\_milk和async\_eat\_bread函数。先后两次同步和两次异步。
+如\autoref{figure:c2breakfirstsequence}所示，这张序列图显示了一个eat函数的执行时序。该函数先执行了同步的eat\_milk和eat\_bread函数，又执行了async\_eat\_milk和async\_eat\_bread函数。先后两次同步和两次异步。
 
 在同步调用的时候，函数是排队执行的，从牛奶到面包是依次进行，在牛奶喝完之前，不可以啃面包，事情只能一步一步完成，而完成的信号就是相应函数的返回。
 

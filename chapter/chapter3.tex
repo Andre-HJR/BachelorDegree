@@ -14,8 +14,7 @@ ring\_scheduler中的黑盒调度任务池资源，同时为内核和用户提�
 
 \subsubsection{元数据}
 
-元数据是ring\_scheduler基本的调度单位
-
+元数据是ring\_scheduler基本的调度单位，其包含了基本的任务信息，执行核心，地址空间信息，任务指针和相应的任务状态。
 \begin{itemize}
 \item hart\_id: 运行该任务的硬件线程编号，简单化为核的ID号
 \item address\_space\_id: 地址空间编号
@@ -36,7 +35,7 @@ state标记这个任务的状态，至少会有两种状态的存在：就绪与
 就绪状态的任务可以被ring\_scheduler弹出交给内核或用户运行，睡眠状态的任务只有被唤醒器唤醒之后才能转成就绪状态，然后被进一步执行。
 
 \subsubsection{ring\_scheduler的接口}
-
+\begin{figure}[h]
 \begin{lstlisting}[caption=调度器的接口约束]
 pub trait Scheduler<T: Clone + PartialEq> {
     type Priority;
@@ -52,7 +51,9 @@ pub trait Scheduler<T: Clone + PartialEq> {
     }
 }
 \end{lstlisting}
+\end{figure}
 
+如果需要使用ring\_scheduler，则在内核或用户的异步库中需要实现调度器的相应的接口约束，如下所示：
 
 \begin{itemize}
 \item add\_task：尝试向调度器中添加一个任务
@@ -88,7 +89,7 @@ pub trait Scheduler<T: Clone + PartialEq> {
 \subsubsection{共享的数据}
 
 参考元数据， $\boldsymbol{\mathrm{Task}} := (\mathrm{hartId}, \mathrm{addressSpaceId}, \mathrm{taskRepr}, \mathrm{State})^{\mathrm{T}}$。为了使得内核和用户态的任务可以得到共享，因此内核态和用户态的任务都应当有如下描述：
-
+\begin{figure}[h]
 \begin{lstlisting}
 struct Task {
     pub id: TaskId,
@@ -97,11 +98,11 @@ struct Task {
     pub future: Mutex<Pin<Box<dyn Future<Output = ()> + 'static + Send + Sync>>>, 
 }
 \end{lstlisting}
+\end{figure}
 
 \subsubsection{执行器的实现}
 
 由于调度器和执行器是分离的，调度器只知道任务的运行状态，而不知道该如何对任务进行操作。因此后半部分的工作将需要执行器的介入，而执行器的工作依赖于调度器的返回，若执行器返回遵循以下的规则
-
 \begin{equation}
     \label{equation:c3schedulerreturn}
     \begin{aligned}
@@ -109,8 +110,7 @@ struct Task {
     \end{aligned}
 \end{equation}
 
-其中
-
+    如\autoref{equation:c3schedulerreturn}所示，调度器的返回向量，应当记录了任务指针，对CPU使用权的让渡，任务的状态，和任务是否完成，其详细的描述如下：
 \begin{itemize}
     \item TaskRepr, 应当立即执行特定任务, 执行器从调度器获得这个值的时候需要调用相关方法释放任务,如果不释放任务，再次执行，还是会得到相同的任务。
     \item ShouldYield, 其他地址空间的任务要运行，应当提示执行器主动让出，并携带下一个地址空间信息。与此同时用户态应该执行yield，保存当前用户上下文，并切换至内核转到下一个地址空间。
@@ -119,11 +119,9 @@ struct Task {
 \end{itemize}
 
 
-内核执行器的设计
-
-在一个大循环中，不断从共享调度器中拿到任务，对任务进行poll操作，如果返回Ready，从共享调度器中删除该任务，如果返回Pending，将该任务设置为睡眠状态。如果共享调度器中所有任务都已完成，则退出系统。
-
-\begin{lstlisting}[caption=内核执行器的设计]
+\autoref{code:kernelexecutor}是内核执行器的设计，在一个大循环中，不断从共享调度器中拿到任务，对任务进行poll操作，如果返回Ready，从共享调度器中删除该任务，如果返回Pending，将该任务设置为睡眠状态。如果共享调度器中所有任务都已完成，则退出系统。
+\begin{figure}[h]
+\begin{lstlisting}[caption=内核执行器的设计, label = code:kernelexecutor]
 pub fn run_until_idle() {
     loop {
         let task = peek_task(); // 从共享调度器中拿出下一个任务的指针，不弹出
@@ -149,12 +147,11 @@ pub fn run_until_idle() {
     }
 }
 \end{lstlisting}
+\end{figure}
 
-用户执行器的设计
-
-用户执行器的设计和内核执行器存在一点区别，就是当拿到不在当前地址空间的任务的时候，不释放这个任务的内存，执行切换地址空间的系统调用。
-
-\begin{lstlisting}[caption=用户执行器的设计]
+用户执行器的设计如\autoref{code:userexecutor} 用户执行器的设计和内核执行器存在一点区别，就是当拿到不在当前地址空间的任务的时候，不释放这个任务的内存，执行切换地址空间的系统调用。
+\begin{figure}[h]
+\begin{lstlisting}[caption=用户执行器的设计, label=code:userexecutor]
 pub fn run_until_idle() {
     loop {
         let task = peek_task(); // 从共享调度器中拿出下一个任务的指针，不弹出
@@ -170,6 +167,7 @@ pub fn run_until_idle() {
     }
 }
 \end{lstlisting}
+\end{figure}
 
 \section{模块设计}
 
@@ -178,19 +176,16 @@ pub fn run_until_idle() {
 \subsection{静态模块}
 
 在静态模块的设计中，系统模块设计应当遵循以下原则：
-
 \begin{enumerate}
     \item 最小正交化的模块
     \item 树状依赖和空间隔离
 \end{enumerate}
 
 \subsubsection{最小正交的模块}
-
-
 \begin{figure}[htb]
     \figureCapSet
     \centering
-    \includegraphics[width=.8\linewidth]{figure/c3/starfishstructure.png}
+    \includegraphics[scale=0.5]{figure/c3/starfishstructure.png}
     \caption{Starfish 的静态模块分解图}
     \label{figure:c3starfishstructure}
 \end{figure}
@@ -200,8 +195,6 @@ pub fn run_until_idle() {
 正交，顾名思义就是将一个复杂的“合力”,通过相应的参考系，进行有序分解，形成一个可以通过参考系中的相应因子描述的矢量，例如 $\boldsymbol {v}=(a, b)$， 则可以准确表述矢量$\boldsymbol {v}$在直角坐标系中的空间表示。
 
 类比前者，提出抽象正交化的概念，我们将整个抽象空间则概括为由抽象层级和抽象因子组成的抽象评估空间，其空间的单位为抽象评估因子，则可以得到如下式子，
-
-
 \begin{equation}
     \label{equation:c3elf}
     \begin{aligned}
@@ -210,7 +203,6 @@ pub fn run_until_idle() {
 \end{equation}
 
 其中$\boldsymbol{E}$表示评估因子，L表示抽象层级，F表示抽象因子。由此可以总结出两组概念：最小正交化和严格最小正交化。
-
 \begin{enumerate}
     \item 最小正交化： 当$L=0$时，即抽象层级为0，即模块不可再分的情况下， $\boldsymbol{E}$为最小正交化的评估因子，此时模块分解为最小正交化。
     \item 严格最小正交化： 在满足最小正交化的前提下， 有$F = {F_{0}, F_{1}, \cdots, F_{n}}$，其中$0 = {F_{0} \cap F_{1} \cap \cdots \cap F_{n}}$, 此时， $\boldsymbol{E}$为严格正交化的评估因子，此时模块分解为严格最小正交化。
@@ -245,7 +237,6 @@ pub fn run_until_idle() {
 在运行时，系统内核根据需要将所有系统模块组件加载并链接到系统中。简而言之，这需要找到并解析系统模块组件对象，将其部分加载到内存中，解析其依赖，根据依赖树，以写入连接器重定位条目，根据需要递归加载任何丢失的系统模块组件，并向符号映射添加新的公共符号。基于此可以为内核进化和故障恢复提供理论基础。加载的系统模块组件集定义了一个系统模块组件空间，一个包含所有系统模块组件公共符号的真正的名称空间，用于快速解析单元格之间的依赖关系。每个加载的系统模块组件节点跟踪其组成部分和存储区域包含它们。每个系统模块组件中的部分对应于其Crate的目标文件中的部分，例如，可执行文件、只读数据和读写数据部分。每个加载的分段节点跟踪其大小、在存储器中的位置以及双向依赖性(输入和输出)；额外的元数据用于加速系统模块组件交换和其他系统功能。
 
 系统模块组件边界的持久性降低了复杂性: 系统内核的持久性系统模块组件边界在其存在的所有阶段提供了一致的系统结构抽象。这将会降低了开发者对系统的理想模型的复杂性，并简化了故障恢复和演化逻辑，因为系统内核可以在运行时从相同的面向系统模块组件的角度自省和管理它自己的代码。从顶层应用程序和库到核心内核组件的一切都可以作为系统模块组件来观察。这使得系统内核能够
-
 \begin{itemize}
 	\item 实现统一适用于任何单元的单一机制，即模块交换，以及
 	\item 以安全的方式从多个系统层(例如，应用和内核组件)联合进化模块。
@@ -257,7 +248,6 @@ pub fn run_until_idle() {
 将系统内核的执行环境与该语言的运行时模型相匹配，并在Rust等现代语言提供的强大的静态类型系统中实现操作系统概念。这将编译器检查的不变量(例如，没有悬空引用)扩展到了所有类型的资源，而不仅仅是语言中内置的那些。
 
 依赖语言设计有两个主要好处：
-
 \begin{itemize}
     \item 首先，它使编译器能够接管资源管理职责，减少了操作系统必须维护的状态，从而减少了状态溢出并加强了隔离。
     \item 它使编译器能够在理解代码行为的过程中应用安全检查，从应用程序到核心内核组件实现端到端安全，并将语义运行时错误转化为编译时错误。

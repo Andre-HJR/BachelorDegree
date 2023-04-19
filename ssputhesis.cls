@@ -125,47 +125,49 @@
     % 2022-11-1 Andre 将目录居中
     contentsname = {\centering{目录}},
     chapter = {
-        name = {,、},
-        number = {\chinese{chapter}},
+        name = {},
+        number = \arabic{chapter},
         format = {\Heiti\bfseries\centering\zihao{3}},
         numberformat += \bfseries,
         pagestyle = plain,
         fixskip = true,
-        beforeskip = 49pt,
-        afterskip = 35pt
+        % beforeskip = 49pt,
+        % afterskip = 35pt
+        beforeskip = 13pt,
+        %afterskip = 27pt
     },
     section = {
-        number = {（\chinese{section}）},
+        %number = {（\chinese{section}）},
         format = {\Heiti\bfseries\zihao{4}},
         numberformat += \bfseries,
         aftername = \hspace{0.5em} ,
-        beforeskip = 9pt,
+        %beforeskip = 9pt,
         afterskip = 6pt,
     },
     subsection = {
-        name={,.},
-        number = {\arabic{subsection}},
+        %name={,.},
+        %number = {\arabic{subsection}},
         format = {\Heiti\bfseries\zihao{-4}},
         numberformat = \bfseries,
         aftername = \hspace{0.5em} ,
         indent=2em,
         fixskip = true,
-        beforeskip = 13pt,
-        afterskip = 9pt,
+        %beforeskip = 13pt,
+        afterskip = 6pt,
     },
     % 2022-11-1 Andre  （非标准）小小节定义，可以根据需求自己修改，同样该 \
     %                      \ 目录层级不会显示在目录中，根据自己的需要进行 \
     %                      \ 相应的添加。
     subsubsection = {   
         format = {\bfseries\zihao{-4}},
-        name = {,.},
-        number = {\arabic{subsection}.\arabic{subsubsection}},
+        name = {},
+        number = {（\arabic{subsubsection}）},
         numberformat += \bfseries,
         aftername = \hspace{0.5em},
-        indent = 4em,
+        indent = 2em,
         fixskip = true,
-        beforeskip = 10pt,
-        afterskip = 7pt,
+        %beforeskip = 10pt,
+        afterskip = 6pt,
     }
 }
 
@@ -186,6 +188,7 @@
 %\renewcommand{\cftsubsecfont}{\Kaiti}
 %\renewcommand{\cftsecfont}{\Songti}
 %\renewcommand{\cftchapfont}{\Songti}
+%\addtocontents{toc}{\protect\vspace{1pt}}
 \setlength{\cftbeforechapskip}{6pt}
 \setlength{\cftbeforesecskip}{0pt}
 \setlength{\cftbeforesubsecskip}{0pt}
@@ -292,7 +295,7 @@
   basicstyle=
       % 2022-11-3 Andre \normalsize
     % \zihao{-4}
-    \zihao{-4}\fontspec{Times New Roman}
+    \zihao{-4}%\fontspec{Times New Roman}
     \lst@ifdisplaystyle\scriptsize\fi
 }
 \lstset{
@@ -301,7 +304,9 @@
 	columns=fullflexible,  % 设置列对齐策略
 	breaklines=true,       % 自动断行
 	captionpos=t,          % 设置 caption 位置为顶部
-	tabsize=4,             % 自动 tab 为 4 个空格
+	tabsize=8,             % 自动 tab 为 4 个空格
+    xleftmargin = 4em,
+    xrightmargin = 4em,
 	commentstyle=\color{codegreen},  % 注释颜色
 	escapeinside={\%*}{*)},          % 逃逸字符（详见 Listings 文档）
     keywordstyle=\color{codeblue},   % 关键词风格
@@ -310,7 +315,7 @@
 	stringstyle=\color{codemauve}\ttfamily, % 字符串风格
 	frame=single,    % 框线
 	frameround=fttt, % 框线为右上角直角，其余弧形
-	keepspaces=true, % 保留空格
+	%keepspaces=true, % 保留空格
 }
 
 
@@ -373,6 +378,13 @@
 \renewcommand{\theenumii}{\arabic{enumii}}
 \renewcommand{\labelenumii}{\theenumii)}
 
+%\setlength{\leftmargin}{1.2em}%左边界
+%\setlength{\parsep}{0ex}%段落间距
+\setlength{\topsep}{1ex}%列表到上下文的垂直距离
+%\setlength{\itemsep}{0.5ex}%条目间距
+%\setlength{\labelsep}{0.3em}%标号和列表项之间的距离,默认0.5em
+%\setlength{\itemindent}{1.1em}%标签缩进量
+
 
 %% @title: 参考文献的相关处理
 %% @author: Andre
@@ -401,19 +413,19 @@
     % \addtocontents{toc}{\cftpagenumbersoff{chapter}} %
     % \chapter*{\zihao{-2}{\ssputhesis@title}\\\vspace{2em}\zihao{3}{摘\texorpdfstring{\quad}{}要}} % 使用 \texorpdfstring 消除警告信息
     \begin{center}
-    {\zihao{-2}{{\HeitiBlod\ssputhesis@title}}\\\vspace{1.5em}\zihao{3}{{\HeitiBlod\text{摘要}}}} % 使用 \texorpdfstring 消除警告信息
+    {\zihao{-2}{{\Heiti\ssputhesis@title}}\\\vspace{1.5em}\zihao{3}{{\Heiti\text{摘要}}}} % 使用 \texorpdfstring 消除警告信息
     \end{center}
     \thispagestyle{plains} %
 }
 \providecommand{\keywordscn}{ %
     \afterpage{\thispagestyle{empty}} %
-    \par\vspace{\baselineskip}\noindent{\bfseries \Heiti{关键词：}} %
+    \par\vspace{\baselineskip}\noindent{\Heiti{关键词：}} %
 }
 \providecommand{\abstracten}{%
     \cleardoublepage
     % \chapter*{\zihao{-2}{\ssputhesis@titleen}\\\vspace{2em}\zihao{3}{ABSTRACT}}
     \begin{center}
-        {\zihao{-2}{{\textbf{\ssputhesis@titleen}}}\\\vspace{1.5em}\zihao{3}{{\textbf{ABSTRACT}}}}
+        {\zihao{-2}{{\textbf\ssputhesis@titleen}}\\\vspace{1.5em}\zihao{3}{{\textbf{ABSTRACT}}}}
     \end{center}
     % \addtocontents{toc}{\cftpagenumberson{chapter}} %
     \thispagestyle{plains} %
@@ -508,7 +520,9 @@
 %\afterpage{thispagestyle{empty}}
 \let\cleardoublepage\clearpage
 \setcounter{page}{1}
+\linespread{1.625}\selectfont
 \begin{center}\zihao{-2}{毕业设计（论文）独创性声明}\end{center}
+\vspace{2em}
 \thispagestyle{plains}
 \makeatletter
 本人所呈交的毕业论文是在指导教师指导下进行的工作及取得的成果。除文中已经注明的内容外，本论文不包含其他个人已经发表或撰写过的研究成果。对本文的研究做出重要贡献的个人和集体，均已在文中作了明确说明并表示谢意。
@@ -529,7 +543,9 @@
 \cleardoublepage
 
 \tocloftpagestyle{plains}
+\begin{spacing}{1.625}
 \tableofcontents
+\end{spacing}
 \thispagestyle{plains}
 \afterpage{\thispagestyle{empty}}
 \cleardoublepage
